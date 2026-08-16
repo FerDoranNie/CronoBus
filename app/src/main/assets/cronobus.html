@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CronoBus - Control y Despacho ITS</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0a0a0a',
+            'primary-container': '#212121',
+            secondary: '#0b6c4b',
+            'secondary-container': '#a0f4ca',
+            'on-secondary-container': '#177251',
+            accent: '#ffba38',
+            'accent-dark': '#b57e00',
+            'accent-container': '#2f1e00',
+            error: '#ba1a1a',
+            'error-container': '#ffdad6',
+            'on-error': '#93000a',
+            surface: '#f9f9f9',
+            'surface-card': '#ffffff',
+            'surface-mid': '#eeeeee',
+            border: '#c4c7c7',
+            'text-main': '#1a1c1c',
+            'text-muted': '#444748'
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          boxShadow: {
+            'hard': '4px 4px 0px rgba(10,10,10,0.1)',
+            'hard-sm': '2px 2px 0px rgba(10,10,10,0.1)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Google Fonts: Inter -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    body { font-family: 'Inter', sans-serif; background-color: #f9f9f9; color: #1a1c1c; margin: 0; }
+    
+    /* Utilitarian Components */
+    .card { background-color: #ffffff; border: 1px solid #c4c7c7; border-radius: 8px; }
+    .btn { border-radius: 4px; font-weight: 600; padding: 0.5rem 1rem; border: 1px solid #c4c7c7; transition: all 0.2s; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .btn-primary { background-color: #0b6c4b; color: #ffffff; border-color: #0b6c4b; }
+    .btn-primary:hover { background-color: #085038; }
+    .btn-secondary { background-color: transparent; color: #0a0a0a; border-color: #0a0a0a; }
+    .btn-secondary:hover { background-color: #eeeeee; }
+    .btn-warning { background-color: #ffba38; color: #0a0a0a; border-color: #ffba38; }
+    .btn-error { background-color: #ffdad6; color: #93000a; border-color: #ba1a1a; }
+    
+    .pill { border-radius: 12px; padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #c4c7c7; text-transform: uppercase; letter-spacing: 0.05em; }
+    .pill-green { background-color: #a0f4ca; color: #177251; border-color: #0b6c4b; }
+    .pill-amber { background-color: #ffba38; color: #2f1e00; border-color: #b57e00; }
+    .pill-red { background-color: #ffdad6; color: #93000a; border-color: #ba1a1a; }
+    
+    /* Layout & Tabs */
+    .view-content { display: none; }
+    .view-content.active { display: block; }
+    
+    #view-admin.active { display: grid; }
+    
+    /* Map Styles */
+    #map-admin, #map-public { z-index: 1; }
+    .leaflet-popup-content-wrapper { border-radius: 8px; border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); font-family: 'Inter', sans-serif;}
+    .leaflet-popup-content { margin: 12px; }
+    
+    /* Custom Scrollbar for side panel */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f9f9f9; }
+    ::-webkit-scrollbar-thumb { background: #c4c7c7; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+  </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+  <!-- Top Header -->
+  <header class='bg-[#0a0a0a] text-white px-4 py-3 flex justify-between items-center shrink-0 z-50 relative'>
+    <div class='flex flex-col'>
+      <h1 class='text-xs font-bold uppercase tracking-wider text-[#ffba38]'>CronoBus System</h1>
+      <span class='text-lg font-bold leading-tight'>B2B ITS Control</span>
+    </div>
+    <div class='flex items-center gap-2'>
+      <div class='flex flex-col items-end'>
+        <span class='text-[10px] uppercase opacity-60'>Despacho</span>
+        <span class='font-mono font-bold text-sm'>Central</span>
+      </div>
+      <div class='w-2 h-2 rounded-full bg-[#0b6c4b] ring-4 ring-[#0b6c4b]/20'></div>
+    </div>
+  </header>
+
+  <!-- View Selector Tabs -->
+  <nav class='flex border-b border-[#c4c7c7] bg-white shrink-0 z-50 relative' id="nav-tabs">
+    <button class='flex-1 py-3 text-xs font-bold uppercase border-b-2 border-[#0b6c4b] text-[#0b6c4b] active:bg-slate-50' onclick="switchTab('driver', this)">Conductor</button>
+    <button class='flex-1 py-3 text-xs font-bold uppercase border-b-2 border-transparent text-[#444748] active:bg-slate-50' onclick="switchTab('admin', this)">Despacho</button>
+    <button class='flex-1 py-3 text-xs font-bold uppercase border-b-2 border-transparent text-[#444748] active:bg-slate-50' onclick="switchTab('passenger', this)">Público</button>
+  </nav>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 relative overflow-hidden bg-surface pb-[72px]">
+    
+    <!-- ================= VIEW A: DRIVER MOBILE ================= -->
+    <div id="view-driver" class="view-content active h-full overflow-y-auto p-4 md:p-6 lg:p-8">
+      <div class="max-w-md mx-auto flex flex-col gap-3">
+        
+        <!-- Driver Header -->
+        <div class="flex justify-between items-center shrink-0 mb-1">
+          <div class="flex flex-col">
+            <span class="text-lg font-bold text-[#1a1c1c] leading-tight">Ruta 42 - Ramal Centro</span>
+            <span class="text-xs font-medium text-[#444748]">Unidad #14 • Op: J. Pérez</span>
+          </div>
+          <div id="driver-signal-badge" class="bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE
+          </div>
+        </div>
+
+        <!-- Dispatch & Headway -->
+        <div class='grid grid-cols-2 gap-3 shrink-0 mb-1'>
+          <div class='bg-[#a0f4ca] border border-[#0b6c4b] rounded-lg p-3 flex flex-col justify-between min-h-[90px]'>
+            <span class='text-[10px] font-bold uppercase text-[#177251]'>Headway (Intervalo)</span>
+            <div class='flex flex-col'>
+              <span id="driver-headway" class='text-2xl font-mono font-black text-[#0b6c4b]'>-02:30 min</span>
+              <span class='text-[10px] font-medium text-[#177251]'>Distancia Óptima</span>
+            </div>
+          </div>
+          <div class='bg-[#2f1e00] border border-[#ffba38] rounded-lg p-3 flex flex-col justify-between min-h-[90px]'>
+            <span class='text-[10px] font-bold uppercase text-[#ffba38]'>Próx. Salida</span>
+            <div class='flex flex-col'>
+              <span class='text-2xl font-mono font-black text-[#ffba38]'>02:15</span>
+              <span class='text-[10px] font-medium text-[#ffba38]/70'>A tiempo</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoint Monitor (Geofences) -->
+        <div class='bg-white border border-[#c4c7c7] rounded-lg flex flex-col overflow-hidden mb-1'>
+          <div class='px-3 py-2 bg-[#eeeeee] border-b border-[#c4c7c7] flex justify-between items-center'>
+            <span class='text-[11px] font-bold uppercase text-[#444748]'>Checador Digital</span>
+            <span class='text-[10px] font-mono text-[#444748]'>Progreso: 2/4</span>
+          </div>
+          <div class='flex-1 px-3 py-2 space-y-1'>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee] opacity-40'>
+              <div class='w-5 h-5 rounded-sm bg-[#0b6c4b] flex items-center justify-center text-white text-[10px]'>✓</div>
+              <div class='flex-1'>
+                <div class='text-xs font-bold text-[#1a1c1c]'>Base A - Sevilla</div>
+              </div>
+              <div class='text-[10px] font-bold text-[#0b6c4b]'>OK</div>
+            </div>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee] bg-green-50/50 -mx-3 px-3'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#0b6c4b] flex items-center justify-center text-[#0b6c4b] animate-pulse'>
+                <div class='w-2 h-2 bg-[#0b6c4b] rounded-full'></div>
+              </div>
+              <div class='flex-1'>
+                <div class='text-xs font-bold text-[#1a1c1c]'>Estación Diana</div>
+                <div class='text-[10px] text-[#444748]'>EN RANGO...</div>
+              </div>
+              <div class='text-[10px] font-bold text-[#0b6c4b]'>A TIEMPO</div>
+            </div>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee]'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7]'></div>
+              <div class='flex-1'>
+                <div class='text-xs font-bold text-[#1a1c1c]'>Hospital Gral.</div>
+              </div>
+              <div class='text-[10px] font-bold text-[#444748]'>--:--</div>
+            </div>
+            <div class='flex items-center gap-3 py-2'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7]'></div>
+              <div class='flex-1'>
+                <div class='text-xs font-bold text-[#1a1c1c]'>Terminal Centro</div>
+              </div>
+              <div class='text-[10px] font-bold text-[#444748]'>--:--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions & Reporting -->
+        <div class='grid grid-cols-4 gap-2 shrink-0 mb-1'>
+          <button onclick="reportIncidence('Trafico')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+            <span class='text-lg'>⚠️</span>
+            <span class='text-[9px] font-bold uppercase'>Tráfico</span>
+          </button>
+          <button onclick="reportIncidence('Bloqueo')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+            <span class='text-lg'>🛑</span>
+            <span class='text-[9px] font-bold uppercase'>Bloqueo</span>
+          </button>
+          <button onclick="setOccupancy('Media')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+            <span class='text-lg'>👥</span>
+            <span class='text-[9px] font-bold uppercase'>Aforo (Med)</span>
+          </button>
+          <button onclick="setOccupancy('Lleno')" class='flex flex-col items-center justify-center gap-1 bg-[#ffdad6] p-2 rounded-md border border-[#ba1a1a] active:bg-[#ba1a1a] active:text-white group'>
+            <span class='text-lg'>🚨</span>
+            <span class='text-[9px] font-bold uppercase text-[#93000a] group-active:text-white'>Lleno</span>
+          </button>
+        </div>
+
+        <!-- Incentives / Fines Panel -->
+        <div class='bg-[#0a0a0a] text-white rounded-lg p-3 flex justify-between items-center shrink-0 mb-3'>
+          <div class='flex flex-col'>
+            <span class='text-[9px] uppercase opacity-60'>Bono Puntualidad (Hoy)</span>
+            <span class='text-lg font-mono font-bold text-[#a0f4ca]'>+$45.00 MXN</span>
+          </div>
+          <div class='h-8 w-px bg-white/20'></div>
+          <div class='flex flex-col items-end'>
+            <span class='text-[9px] uppercase opacity-60'>Multas Pendientes</span>
+            <div class='flex items-center gap-2'>
+              <span class='text-lg font-mono font-bold text-[#ffdad6]'>0 Sanciones</span>
+              <button onclick="alert('Abriendo disputa con evidencia GPS...')" class='text-[9px] font-bold bg-[#ffba38] text-[#2f1e00] px-2 py-1 rounded-sm active:opacity-80'>APELAR</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= VIEW B: ADMIN DASHBOARD ================= -->
+    <div id="view-admin" class="view-content h-full grid-cols-1 md:grid-cols-12 gap-0 hidden">
+      
+      <!-- Side Panel -->
+      <div class="col-span-1 md:col-span-4 lg:col-span-3 bg-[#f9f9f9] p-4 border-r border-[#c4c7c7] flex flex-col gap-4 overflow-y-auto z-10 relative">
+        <h2 class="text-lg font-bold text-[#1a1c1c]">Panel de Control ITS</h2>
+        
+        <!-- Metrics SaaS -->
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
+            <span class="text-[10px] font-bold text-[#444748] uppercase">Unidades Activas</span>
+            <span class="text-xl font-bold font-mono text-[#1a1c1c]">5 / 8</span>
+          </div>
+          <div class="bg-[#eeeeee] border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
+            <span class="text-[10px] font-bold text-[#444748] uppercase">SaaS Mensual</span>
+            <span class="text-xl font-bold font-mono text-[#0b6c4b]">$750</span>
+          </div>
+          <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
+            <span class="text-[10px] font-bold text-[#444748] uppercase">Bonos (OPEX)</span>
+            <span class="text-xl font-bold font-mono text-[#0b6c4b]">$120</span>
+          </div>
+          <div class="bg-[#ffdad6] border border-[#ba1a1a] rounded-lg p-3 flex flex-col justify-between">
+            <span class="text-[10px] font-bold text-[#93000a] uppercase">Multas Cobradas</span>
+            <span class="text-xl font-bold font-mono text-[#93000a]">$50</span>
+          </div>
+        </div>
+
+        <button class="bg-[#eeeeee] border border-[#c4c7c7] rounded-md py-2 w-full text-xs font-bold active:bg-[#0a0a0a] active:text-white transition-colors" onclick="exportData()">⬇ Exportar Resumen CSV</button>
+
+        <hr class="border-[#c4c7c7] my-1">
+        
+        <div class="flex justify-between items-center">
+          <h3 class="text-sm font-bold text-[#1a1c1c]">Alertas en Vivo</h3>
+          <span class="bg-[#ffba38] text-[#2f1e00] border border-[#b57e00] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider" id="alert-counter">1 Alerta</span>
+        </div>
+
+        <!-- Alerts List -->
+        <div class="flex flex-col gap-3" id="admin-alerts-container">
+          <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#ba1a1a] rounded-md p-3">
+            <div class="flex justify-between items-start mb-1">
+              <span class="text-xs font-bold text-[#ba1a1a]">CARRERITA - Exceso Vel.</span>
+              <span class="text-[10px] text-[#444748] font-mono">14:22</span>
+            </div>
+            <p class="text-xs mb-2 text-[#1a1c1c]">Unidad #09 invadió headway de U#14. Sanción: $50.</p>
+            <button class="bg-[#eeeeee] border border-[#c4c7c7] rounded w-full py-1 text-[10px] font-bold active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]" onclick="this.parentElement.style.display='none'">Aplicar Exención</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Container -->
+      <div class="col-span-1 md:col-span-8 lg:col-span-9 relative">
+        <div id="map-admin" class="w-full h-full bg-[#eeeeee]"></div>
+      </div>
+
+    </div>
+
+    <!-- ================= VIEW C: PASSENGER ETA ================= -->
+    <div id="view-passenger" class="view-content h-full relative hidden">
+      <div id="map-public" class="absolute inset-0 z-0 bg-[#eeeeee]"></div>
+      
+      <!-- Public UI Overlay -->
+      <div class="absolute top-4 left-4 right-4 md:w-80 z-[1000]">
+        <div class="bg-white border border-[#c4c7c7] rounded-lg p-4">
+          <label class="block text-[10px] font-bold text-[#444748] mb-1 uppercase">Selecciona Ruta</label>
+          <select class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold mb-3 focus:outline-none focus:border-[#0b6c4b]">
+            <option>Ruta 42 - Centro/Diana</option>
+            <option>Ruta 15 - Universidad</option>
+          </select>
+          <label class="block text-[10px] font-bold text-[#444748] mb-1 uppercase">Tu Parada</label>
+          <select class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold focus:outline-none focus:border-[#0b6c4b]">
+            <option>Estación Diana</option>
+            <option>Hospital Gral.</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[1000]">
+        <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#0b6c4b] rounded-lg p-3 flex gap-3 items-center">
+          <div class="w-12 h-12 bg-[#a0f4ca] text-[#0b6c4b] border border-[#0b6c4b] rounded flex flex-col items-center justify-center font-bold shrink-0">
+            <span class="text-xl font-mono leading-none" id="eta-mins">4</span>
+            <span class="text-[9px] uppercase">Min</span>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-bold text-[#1a1c1c] leading-tight">Unidad #14 en camino</p>
+            <p class="text-[10px] font-medium text-[#444748] mb-1">Llega a Estación Diana</p>
+            <div class="inline-block bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase">Asientos Disponibles</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= SIMULATION CONTROLS (BOTTOM BAR) ================= -->
+  <footer class='bg-[#eeeeee] border-t border-[#c4c7c7] p-2 flex flex-wrap items-center justify-between gap-3 shrink-0 absolute bottom-0 w-full z-[2000] min-h-[56px]'>
+    <div class='flex items-center gap-2'>
+      <div class='bg-[#0a0a0a] px-3 py-1.5 rounded flex items-center gap-2'>
+         <div class='w-2 h-2 bg-[#ffba38] rounded-full animate-pulse'></div>
+         <span class='text-white text-[10px] font-bold uppercase'>SIM RUNNING</span>
+      </div>
+      <button id="btn-play-pause" class='h-8 px-3 bg-white border border-[#c4c7c7] rounded text-[10px] text-[#1a1c1c] font-bold active:bg-[#c4c7c7]' onclick="toggleSim()">▶ Iniciar</button>
+      <select id="sim-speed" class="h-8 px-2 bg-white border border-[#c4c7c7] rounded text-[10px] font-bold text-[#1a1c1c]" onchange="setSpeed(this.value)">
+        <option value="1">1x Vel</option>
+        <option value="3">3x Vel</option>
+        <option value="10">10x Vel</option>
+      </select>
+    </div>
+    <div class='flex flex-1 md:flex-none gap-1'>
+      <button class='h-8 px-3 bg-white border border-[#c4c7c7] rounded text-[10px] text-[#1a1c1c] font-bold active:bg-[#c4c7c7]' onclick="triggerBlock()">🛑 Sim Bloqueo</button>
+      <button class='h-8 px-3 bg-white border border-[#c4c7c7] rounded text-[10px] text-[#1a1c1c] font-bold active:bg-[#c4c7c7]' onclick="triggerSignalLoss()">📵 Offline Mode</button>
+    </div>
+  </footer>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // --- STATE ---
+    let state = {
+      simPlaying: false,
+      speed: 1,
+      signalLost: false,
+      activeTab: 'driver'
+    };
+
+    // Route coordinates (Mexico City core)
+    const routeCoords = [
+      [19.4270, -99.1676], // Sevilla
+      [19.4260, -99.1700], // Transition
+      [19.4255, -99.1720], // Diana
+      [19.4245, -99.1750], // Transition
+      [19.4239, -99.1772], // Estela
+      [19.4225, -99.1800], // Transition
+      [19.4215, -99.1824]  // Chapultepec
+    ];
+
+    const geofences = [
+      { name: "Base A - Sevilla", latlng: [19.4270, -99.1676], radius: 50 },
+      { name: "Estación Diana", latlng: [19.4255, -99.1720], radius: 50 },
+      { name: "Hospital Gral.", latlng: [19.4239, -99.1772], radius: 50 },
+      { name: "Terminal Centro", latlng: [19.4215, -99.1824], radius: 50 }
+    ];
+
+    let units = [
+      { id: 14, name: "U-14", progress: 0, speedMult: 1, lat: routeCoords[0][0], lng: routeCoords[0][1], status: 'ok', occupancy: 'Baja' },
+      { id: 9,  name: "U-09", progress: 0.3, speedMult: 0.8, lat: routeCoords[1][0], lng: routeCoords[1][1], status: 'ok', occupancy: 'Media' },
+      { id: 22, name: "U-22", progress: 0.6, speedMult: 1.2, lat: routeCoords[3][0], lng: routeCoords[3][1], status: 'ok', occupancy: 'Lleno' }
+    ];
+
+    // --- LEAFLET INIT ---
+    let mapAdmin, mapPublic;
+    let adminMarkers = {};
+    let publicMarkers = {};
+
+    function initMaps() {
+      // Admin Map
+      mapAdmin = L.map('map-admin', { zoomControl: false }).setView([19.4245, -99.1750], 15);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapAdmin);
+      L.control.zoom({ position: 'topright' }).addTo(mapAdmin);
+      
+      // Polyline
+      L.polyline(routeCoords, { color: '#0a0a0a', weight: 4, opacity: 0.8 }).addTo(mapAdmin);
+      
+      // Geofences Admin
+      geofences.forEach(gf => {
+        L.circle(gf.latlng, { radius: gf.radius, color: '#0b6c4b', fillColor: '#a0f4ca', fillOpacity: 0.4, weight: 2 }).addTo(mapAdmin).bindPopup(gf.name);
+      });
+
+      // Public Map
+      mapPublic = L.map('map-public', { zoomControl: false }).setView([19.4245, -99.1750], 15);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapPublic);
+      L.polyline(routeCoords, { color: '#0b6c4b', weight: 5, opacity: 0.5 }).addTo(mapPublic);
+
+      createMarkers();
+    }
+
+    function createIcon(unit) {
+      let bgColor = '#0b6c4b'; // green
+      let border = 'white';
+      if(unit.status === 'blocked') bgColor = '#ba1a1a'; // red
+      if(state.signalLost && unit.id === 14) bgColor = '#ffba38'; // amber store&forward
+
+      return L.divIcon({
+        className: 'custom-bus-icon',
+        html: `<div style="background-color: ${bgColor}; color: ${bgColor === '#ffba38' ? '#0a0a0a' : 'white'}; border: 2px solid ${border}; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; box-shadow: 2px 2px 0px rgba(10,10,10,0.2);">${unit.id}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+    }
+
+    function createMarkers() {
+      units.forEach(u => {
+        let marker = L.marker([u.lat, u.lng], { icon: createIcon(u) }).addTo(mapAdmin);
+        marker.bindPopup(`<b>Unidad ${u.id}</b><br>Estado: ${u.status}<br>Aforo: ${u.occupancy}`);
+        adminMarkers[u.id] = marker;
+
+        let pMarker = L.marker([u.lat, u.lng], { icon: createIcon(u) }).addTo(mapPublic);
+        publicMarkers[u.id] = pMarker;
+      });
+    }
+
+    function updateMarkers() {
+      units.forEach(u => {
+        if(adminMarkers[u.id]) {
+          adminMarkers[u.id].setLatLng([u.lat, u.lng]);
+          adminMarkers[u.id].setIcon(createIcon(u));
+        }
+        if(publicMarkers[u.id]) {
+          publicMarkers[u.id].setLatLng([u.lat, u.lng]);
+          publicMarkers[u.id].setIcon(createIcon(u));
+        }
+      });
+    }
+
+    // --- LOGIC ---
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active', 'hidden'));
+      document.querySelectorAll('.view-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById('view-' + tabId).classList.remove('hidden');
+      document.getElementById('view-' + tabId).classList.add('active');
+      
+      // Nav styles
+      if(btn) {
+        document.querySelectorAll('#nav-tabs button').forEach(b => {
+          b.classList.remove('border-[#0b6c4b]', 'text-[#0b6c4b]');
+          b.classList.add('border-transparent', 'text-[#444748]');
+        });
+        btn.classList.add('border-[#0b6c4b]', 'text-[#0b6c4b]');
+        btn.classList.remove('border-transparent', 'text-[#444748]');
+      }
+
+      state.activeTab = tabId;
+      
+      // Leaflet needs resize fix when container becomes visible
+      setTimeout(() => {
+        if(tabId === 'admin') mapAdmin.invalidateSize();
+        if(tabId === 'passenger') mapPublic.invalidateSize();
+      }, 100);
+    }
+
+    function getInterpolatedPosition(progress) {
+      // Progress 0.0 to 1.0 along routeCoords
+      const totalSegments = routeCoords.length - 1;
+      let scaledProgress = progress * totalSegments;
+      let idx = Math.floor(scaledProgress);
+      let t = scaledProgress - idx;
+      
+      if (idx >= totalSegments) return { lat: routeCoords[totalSegments][0], lng: routeCoords[totalSegments][1] };
+
+      let p1 = routeCoords[idx];
+      let p2 = routeCoords[idx+1];
+      
+      return {
+        lat: p1[0] + (p2[0] - p1[0]) * t,
+        lng: p1[1] + (p2[1] - p1[1]) * t
+      };
+    }
+
+    let lastTick = Date.now();
+    function tick() {
+      if(!state.simPlaying) return requestAnimationFrame(tick);
+      
+      let now = Date.now();
+      let dt = (now - lastTick) / 1000; // seconds
+      lastTick = now;
+
+      // Update positions
+      units.forEach(u => {
+        if(u.status !== 'blocked') {
+          // base speed: traverse route in ~60 seconds at 1x
+          let speedFactor = 1 / 60; 
+          u.progress += speedFactor * dt * state.speed * u.speedMult;
+          if(u.progress > 1) u.progress = 0; // loop
+        }
+        
+        let pos = getInterpolatedPosition(u.progress);
+        u.lat = pos.lat;
+        u.lng = pos.lng;
+      });
+
+      // Simple ETA update for Unit 14
+      let u14 = units.find(u => u.id === 14);
+      let distRemaining = 1.0 - u14.progress;
+      let etaMins = Math.max(1, Math.floor(distRemaining * 10 / state.speed));
+      document.getElementById('eta-mins').innerText = etaMins;
+
+      updateMarkers();
+      requestAnimationFrame(tick);
+    }
+
+    // --- CONTROLS ---
+    function toggleSim() {
+      state.simPlaying = !state.simPlaying;
+      let btn = document.getElementById('btn-play-pause');
+      if(state.simPlaying) {
+        lastTick = Date.now();
+        btn.innerText = "⏸ Pausar";
+        btn.classList.add('bg-[#ffdad6]', 'text-[#93000a]', 'border-[#ba1a1a]');
+        btn.classList.remove('bg-white', 'text-[#1a1c1c]', 'border-[#c4c7c7]');
+      } else {
+        btn.innerText = "▶ Iniciar";
+        btn.classList.remove('bg-[#ffdad6]', 'text-[#93000a]', 'border-[#ba1a1a]');
+        btn.classList.add('bg-white', 'text-[#1a1c1c]', 'border-[#c4c7c7]');
+      }
+    }
+
+    function setSpeed(val) {
+      state.speed = parseFloat(val);
+    }
+
+    function triggerBlock() {
+      let u14 = units.find(u => u.id === 14);
+      u14.status = u14.status === 'blocked' ? 'ok' : 'blocked';
+      updateMarkers();
+      
+      // Add alert to admin
+      if(u14.status === 'blocked') {
+        const alertHtml = `
+          <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#ffba38] rounded-md p-3 animate-pulse">
+            <div class="flex justify-between items-start mb-1">
+              <span class="text-xs font-bold text-[#b57e00]">REPORTE BLOQUEO</span>
+              <span class="text-[10px] text-[#444748] font-mono">Ahora</span>
+            </div>
+            <p class="text-xs mb-2 text-[#1a1c1c]">Unidad #14 reporta bloqueo en la vía. Multas pausadas.</p>
+            <button class="bg-[#eeeeee] border border-[#c4c7c7] rounded w-full py-1 text-[10px] font-bold active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]" onclick="this.parentElement.style.display='none'">Aplicar Exención General</button>
+          </div>
+        `;
+        document.getElementById('admin-alerts-container').insertAdjacentHTML('afterbegin', alertHtml);
+      }
+    }
+
+    function triggerSignalLoss() {
+      state.signalLost = !state.signalLost;
+      let badge = document.getElementById('driver-signal-badge');
+      if(state.signalLost) {
+        badge.className = 'bg-[#2f1e00] text-[#ffba38] border border-[#ffba38] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase';
+        badge.innerHTML = 'STORE & FORWARD';
+      } else {
+        badge.className = 'bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE';
+      }
+      updateMarkers();
+    }
+
+    function setOccupancy(level) {
+      units.find(u => u.id === 14).occupancy = level;
+      alert(`Aforo reportado: ${level}`);
+    }
+
+    function reportIncidence(type) {
+      alert(`Reporte enviado: ${type}. El despachador será notificado.`);
+    }
+
+    function exportData() {
+      alert("Generando CSV...\nUnidades: 8\nRecaudación SaaS: $1,200\nMultas Inyectadas: $50\nBonos Pagados: $120");
+    }
+
+    // Init
+    window.onload = () => {
+      // Setup initial nav style
+      let firstBtn = document.querySelector('#nav-tabs button');
+      firstBtn.classList.add('border-[#0b6c4b]', 'text-[#0b6c4b]');
+      firstBtn.classList.remove('border-transparent', 'text-[#444748]');
+
+      initMaps();
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>

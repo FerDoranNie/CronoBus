@@ -1,0 +1,258 @@
+<!DOCTYPE html><html class="h-full" lang="es"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Driver Mobile Interface</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&amp;family=JetBrains+Mono:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-dim": "#dadada",
+                "secondary": "#705d00",
+                "on-tertiary": "#ffffff",
+                "outline-variant": "#c6c5d4",
+                "on-primary": "#ffffff",
+                "primary-fixed": "#e0e0ff",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary-container": "#6f5c00",
+                "background": "#f9f9f9",
+                "inverse-on-surface": "#f1f1f1",
+                "primary-container": "#1a237e",
+                "on-secondary-fixed": "#221b00",
+                "inverse-primary": "#bdc2ff",
+                "on-secondary": "#ffffff",
+                "on-secondary-fixed-variant": "#544600",
+                "outline": "#767683",
+                "surface-container": "#eeeeee",
+                "on-surface": "#1a1c1c",
+                "tertiary": "#400000",
+                "error-container": "#ffdad6",
+                "inverse-surface": "#2f3131",
+                "on-background": "#1a1c1c",
+                "secondary-fixed-dim": "#e9c400",
+                "surface-container-low": "#f3f3f3",
+                "tertiary-fixed-dim": "#ffb4a8",
+                "on-surface-variant": "#454652",
+                "secondary-fixed": "#ffe170",
+                "surface-bright": "#f9f9f9",
+                "on-tertiary-fixed": "#410000",
+                "surface-container-high": "#e8e8e8",
+                "primary": "#000666",
+                "on-primary-fixed": "#000767",
+                "error": "#ba1a1a",
+                "on-tertiary-container": "#ff6551",
+                "surface-variant": "#e2e2e2",
+                "on-error-container": "#93000a",
+                "on-tertiary-fixed-variant": "#930000",
+                "surface": "#f9f9f9",
+                "primary-fixed-dim": "#bdc2ff",
+                "on-primary-container": "#8690ee",
+                "on-error": "#ffffff",
+                "on-primary-fixed-variant": "#343d96",
+                "tertiary-container": "#680000",
+                "tertiary-fixed": "#ffdad4",
+                "surface-container-highest": "#e2e2e2",
+                "secondary-container": "#fdd400",
+                "surface-tint": "#4c56af"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "margin-desktop": "32px",
+                "touch-target-min": "48px",
+                "base": "8px",
+                "gutter": "24px",
+                "margin-mobile": "16px"
+        },
+        "fontFamily": {
+                "display-lg": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "JetBrains Mono"
+                ],
+                "headline-md": [
+                        "Inter"
+                ],
+                "body-sm": [
+                        "Inter"
+                ],
+                "data-display": [
+                        "JetBrains Mono"
+                ],
+                "display-lg-mobile": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "800"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "data-display": [
+                        "20px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "display-lg-mobile": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "800"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+</head>
+<body class="bg-background text-on-background h-full font-body-lg text-body-lg antialiased overflow-hidden select-none">
+<!-- TopAppBar from JSON -->
+<header class="fixed top-0 w-full z-50 bg-primary text-on-primary border-b border-outline-variant shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)] flex items-center justify-between px-margin-mobile py-4">
+<button class="min-w-touch-target-min min-h-touch-target-min flex items-center justify-center hover:bg-primary-fixed-variant transition-colors active:translate-y-0.5 transition-all rounded">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQq6hbkFqt811jJtDM2VpCTxOlNmhDpYcPVvI2FcFl1Z0VfdlX3fs1nZWK_H9316F-F95uY7NW9-Rz7ohRbkSq1tAWrAOl7VBiQ6UFaHrxbzRmJYdC6wPKSuZ3Z3AzvWBnU3SAu51JJHl8M7EAsc-plsVVa_GLmG4TeCpbfePz3W70FIkWAp9Vv30Tv2Dc7dRiq-A_5zDxGqHhmpc7OEZf6LITI5fCXiio2gmbx2ITxDp9NH4BXi_-" alt="CronoBus Logo" class="h-10 w-auto object-contain">
+<button class="min-w-touch-target-min min-h-touch-target-min flex items-center justify-center hover:bg-primary-fixed-variant transition-colors active:translate-y-0.5 transition-all rounded">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[96px] pb-[96px] h-full overflow-y-auto px-margin-mobile flex flex-col gap-gutter">
+<!-- Header: Next Departure -->
+<section class="bg-surface p-gutter border border-outline-variant rounded-xl flex flex-col items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Próxima Salida</span>
+<div class="flex items-center gap-1 bg-surface-container-high px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="cloud_off">cloud_off</span>
+<span class="font-label-caps text-label-caps text-outline">Offline</span>
+</div>
+</div>
+<div class="font-display-lg-mobile text-display-lg-mobile text-primary font-bold tracking-tight">14:30</div>
+<div class="mt-2 text-on-surface-variant">Ruta 42 - Centro</div>
+</section>
+<!-- Center: Interval Dashboard -->
+<section class="grid grid-cols-2 gap-base">
+<div class="bg-surface-container p-4 border border-outline-variant rounded-lg flex flex-col justify-between shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-2">Unidad Anterior</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-on-surface font-bold">A 4 min</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant pb-1">1.2 km</span>
+</div>
+<div class="w-full bg-surface-variant h-2 mt-4 rounded-full overflow-hidden">
+<div class="bg-secondary-container h-full w-[40%]"></div>
+</div>
+</div>
+<div class="bg-surface-container p-4 border border-outline-variant rounded-lg flex flex-col justify-between shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-2">Unidad Siguiente</span>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-on-surface font-bold">A 8 min</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant pb-1">3.0 km</span>
+</div>
+<div class="w-full bg-surface-variant h-2 mt-4 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[70%]"></div>
+</div>
+</div>
+</section>
+<!-- Bottom: Quick Alerts -->
+<section class="flex-1 flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant pb-2">Alertas Rápidas</h2>
+<div class="grid grid-cols-3 gap-base">
+<button class="bg-error-container text-on-error-container border border-error/20 p-4 rounded-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform shadow-[2px_2px_0px_0px_rgba(186,26,26,0.2)] min-h-[100px]">
+<span class="material-symbols-outlined text-[32px]" data-icon="car_crash" data-weight="fill" style="font-variation-settings: 'FILL' 1;">car_crash</span>
+<span class="font-label-caps text-label-caps font-bold">Accidente</span>
+</button>
+<button class="bg-surface-container text-on-surface border border-outline-variant p-4 rounded-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform min-h-[100px]">
+<span class="material-symbols-outlined text-[32px] text-tertiary-container" data-icon="traffic">traffic</span>
+<span class="font-label-caps text-label-caps font-bold">Tráfico</span>
+</button>
+<button class="bg-surface-container text-on-surface border border-outline-variant p-4 rounded-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform min-h-[100px]">
+<span class="material-symbols-outlined text-[32px] text-tertiary-container" data-icon="block">block</span>
+<span class="font-label-caps text-label-caps font-bold">Bloqueo</span>
+</button>
+</div>
+</section>
+<!-- Occupancy Toggle -->
+<section class="mt-auto mb-4 bg-surface border border-outline-variant rounded-xl p-4 flex items-center justify-between shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="groups">groups</span>
+<span class="font-body-lg text-body-lg font-bold">Ocupación</span>
+</div>
+<div class="flex bg-surface-container-high rounded-lg p-1">
+<button class="px-4 py-2 font-label-caps text-label-caps bg-surface text-on-surface rounded border border-outline-variant shadow-sm">Baja</button>
+<button class="px-4 py-2 font-label-caps text-label-caps text-on-surface-variant">Media</button>
+<button class="px-4 py-2 font-label-caps text-label-caps text-on-surface-variant">Alta</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar from JSON -->
+<nav class="fixed bottom-0 left-0 w-full z-50 h-[80px] bg-primary text-on-primary border-t-2 border-secondary shadow-[0_-2px_0px_0px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 pb-2 md:hidden">
+<button class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 min-w-[64px] min-h-[48px] rounded-xl transition-all">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-label-caps text-label-caps mt-1">Mapa</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-secondary text-on-secondary rounded-xl min-w-[64px] min-h-[48px] font-bold">
+<span class="material-symbols-outlined" data-icon="directions_bus">directions_bus</span>
+<span class="font-label-caps text-label-caps mt-1">Flota</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 min-w-[64px] min-h-[48px] rounded-xl transition-all">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-label-caps text-label-caps mt-1">Alertas</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 min-w-[64px] min-h-[48px] rounded-xl transition-all">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span class="font-label-caps text-label-caps mt-1">Perfil</span>
+</button>
+</nav>
+
+
+</body></html>

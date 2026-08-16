@@ -1,0 +1,314 @@
+<!DOCTYPE html><html class="light" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Dashboard Financiero y Flota</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&amp;family=JetBrains+Mono:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#dadada",
+                        "secondary": "#705d00",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#c6c5d4",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#e0e0ff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#6f5c00",
+                        "background": "#f9f9f9",
+                        "inverse-on-surface": "#f1f1f1",
+                        "primary-container": "#1a237e",
+                        "on-secondary-fixed": "#221b00",
+                        "inverse-primary": "#bdc2ff",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#544600",
+                        "outline": "#767683",
+                        "surface-container": "#eeeeee",
+                        "on-surface": "#1a1c1c",
+                        "tertiary": "#400000",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#2f3131",
+                        "on-background": "#1a1c1c",
+                        "secondary-fixed-dim": "#e9c400",
+                        "surface-container-low": "#f3f3f3",
+                        "tertiary-fixed-dim": "#ffb4a8",
+                        "on-surface-variant": "#454652",
+                        "secondary-fixed": "#ffe170",
+                        "surface-bright": "#f9f9f9",
+                        "on-tertiary-fixed": "#410000",
+                        "surface-container-high": "#e8e8e8",
+                        "primary": "#000666",
+                        "on-primary-fixed": "#000767",
+                        "error": "#ba1a1a",
+                        "on-tertiary-container": "#ff6551",
+                        "surface-variant": "#e2e2e2",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#930000",
+                        "surface": "#f9f9f9",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "on-primary-container": "#8690ee",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#343d96",
+                        "tertiary-container": "#680000",
+                        "tertiary-fixed": "#ffdad4",
+                        "surface-container-highest": "#e2e2e2",
+                        "secondary-container": "#fdd400",
+                        "surface-tint": "#4c56af"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-desktop": "32px",
+                        "touch-target-min": "48px",
+                        "base": "8px",
+                        "gutter": "24px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "data-display": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "data-display": ["20px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex font-body-lg text-body-lg">
+<!-- Sidebar Navigation -->
+<aside class="hidden md:flex flex-col h-screen fixed left-0 top-0 w-[280px] bg-surface-container-low border-r border-outline-variant z-40 overflow-y-auto">
+<div class="p-gutter border-b border-outline-variant flex items-center gap-4">
+<div class="w-12 h-12 rounded overflow-hidden bg-surface-container-lowest flex items-center justify-center"><img src="https://lh3.googleusercontent.com/aida/AP1WRLt8fUzow46_nlClKZeDDS8IsPDtmE2GEaZ3LT4dZe3C1mk_g5iPNvomoB32V2g9pY2T6Ys08oJK9X82XE0w4RczBizqZR6DWYhgBQInCxa4BlcEBA7gesNsjKJEU_WvP4Nz2icBkWh0_YRQdguhDmXGnk1cdzIue_AppZLaDkh_OmaYoJ8ui2YrMKfF7VKOX1vkir6ptVgU2zZYXJyIFFjZcUOnxmlyzFDl78pcI4ypMif2sYokES17GQ" alt="CronoBus Logo" class="w-full h-full object-contain"></div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary truncate">CronoBus</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Operaciones CDMX</p>
+</div>
+</div>
+<nav class="flex-1 py-4">
+<ul class="space-y-2">
+<li class="">
+<a class="flex items-center gap-4 px-gutter py-3 text-on-surface-variant hover:bg-surface-container-highest transition-all duration-100 active:scale-95" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="">Mapa de Flota</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-gutter py-3 text-on-surface-variant hover:bg-surface-container-highest transition-all duration-100 active:scale-95" href="#">
+<span class="material-symbols-outlined">fence</span>
+<span class="">Geocercas</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-gutter py-3 bg-secondary-container text-on-secondary-container font-bold border-l-4 border-primary hover:bg-surface-container-highest transition-all duration-100 active:scale-95" href="#">
+<span class="material-symbols-outlined filled">payments</span>
+<span class="">Análisis Financiero</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-gutter py-3 text-on-surface-variant hover:bg-surface-container-highest transition-all duration-100 active:scale-95" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="">Suscripciones</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-gutter py-3 text-on-surface-variant hover:bg-surface-container-highest transition-all duration-100 active:scale-95" href="#">
+<span class="material-symbols-outlined">warning</span>
+<span class="">Alertas</span>
+</a>
+</li>
+</ul>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[280px] flex flex-col min-h-screen pb-[80px] md:pb-0">
+<!-- TopAppBar -->
+<header class="w-full top-0 bg-primary text-on-primary flex items-center justify-between px-margin-mobile md:px-margin-desktop py-4 border-b border-outline-variant shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)] z-30 sticky">
+<div class="flex items-center gap-4">
+<button class="md:hidden hover:bg-primary-fixed-variant transition-colors p-2 rounded-full active:translate-y-0.5 transition-all">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md">Gestión de Transporte</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden lg:block h-12 w-auto"><img src="https://lh3.googleusercontent.com/aida/AP1WRLt8fUzow46_nlClKZeDDS8IsPDtmE2GEaZ3LT4dZe3C1mk_g5iPNvomoB32V2g9pY2T6Ys08oJK9X82XE0w4RczBizqZR6DWYhgBQInCxa4BlcEBA7gesNsjKJEU_WvP4Nz2icBkWh0_YRQdguhDmXGnk1cdzIue_AppZLaDkh_OmaYoJ8ui2YrMKfF7VKOX1vkir6ptVgU2zZYXJyIFFjZcUOnxmlyzFDl78pcI4ypMif2sYokES17GQ" alt="CronoBus Logo" class="h-full w-auto object-contain"></div>
+<button class="hover:bg-primary-fixed-variant transition-colors p-2 rounded-full active:translate-y-0.5 transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<div class="p-margin-mobile md:p-margin-desktop flex-1 flex flex-col gap-gutter">
+<!-- Filter Actions Bar -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container p-4 rounded-lg border border-outline-variant">
+<div class="flex flex-wrap gap-2">
+<select class="bg-surface border-1.5 border-outline-variant text-on-surface rounded px-4 py-2 font-body-sm focus:outline-none focus:ring-0 focus:border-primary focus:border-[3px]">
+<option>Últimos 7 Días</option>
+<option>Este Mes</option>
+<option>Trimestre Q3</option>
+</select>
+<select class="bg-surface border-1.5 border-outline-variant text-on-surface rounded px-4 py-2 font-body-sm focus:outline-none focus:ring-0 focus:border-primary focus:border-[3px]">
+<option>Todas las Zonas</option>
+<option>Norte</option>
+<option>Sur</option>
+</select>
+</div>
+<button class="flex items-center gap-2 bg-secondary text-on-secondary px-6 py-2 rounded font-label-caps text-label-caps hover:bg-secondary-fixed-dim transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    EXPORTAR REPORTE
+                </button>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Main Map Widget (Spans 2 columns on lg) -->
+<div class="lg:col-span-2 bg-surface rounded-lg border border-outline-variant overflow-hidden flex flex-col h-[400px]">
+<div class="px-4 py-3 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary">Mapa Interactivo de Flota</h3>
+<span class="bg-surface-tint text-on-primary px-2 py-1 rounded font-label-caps text-label-caps">EN VIVO</span>
+</div>
+<div class="flex-1 relative">
+<img class="w-full h-full object-cover" data-alt="A highly detailed, utilitarian digital map interface showing a city grid. The map uses a high-contrast light mode aesthetic with stark white and gray streets against subtle off-white blocks. Several vivid yellow and navy blue pins mark bus locations and geofenced zones. The design is modern, industrial, and optimized for legibility in bright environments, featuring sharp lines and clean typography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCK-Zv29nhhK5k1-Lfw6x1w9abqB-oyjIH6Tj3vtJ0CB8zI_LEBqUdBm0uLcvLl-PJHFbnA0zRrn2HcWgia_1IcDHa5QXFCiupM9GTSg4aWyIxdG9CVkJgT7QHMoI_8k19LigJWkfCb3Sr0O40IbQWSRju490S0H7wc5hhZWWiD8MmZf-s0cqru8-ROovT6QGPaeILk0M_aNzC8Xe8uM8MhEjsVRFHbNlVz_QFBsm2OPQ8e9MmA_T3v">
+<!-- Overlay elements -->
+<div class="absolute bottom-4 right-4 bg-surface p-2 rounded shadow-md border border-outline-variant flex flex-col gap-2">
+<button class="w-10 h-10 bg-surface-container flex items-center justify-center hover:bg-surface-variant"><span class="material-symbols-outlined">add</span></button>
+<button class="w-10 h-10 bg-surface-container flex items-center justify-center hover:bg-surface-variant"><span class="material-symbols-outlined">remove</span></button>
+</div>
+</div>
+</div>
+<!-- Financial Summary Cards -->
+<div class="flex flex-col gap-gutter">
+<!-- Revenue Card -->
+<div class="bg-primary text-on-primary p-6 rounded-lg border border-outline-variant shadow-sm flex flex-col justify-between h-full">
+<div>
+<p class="font-label-caps text-label-caps opacity-80 mb-2">INGRESO SUSCRIPCIONES (MXN)</p>
+<h4 class="font-display-lg text-display-lg-mobile md:text-display-lg mb-1">$428,500</h4>
+<p class="font-body-sm text-body-sm text-secondary-fixed flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+                                +12.5% vs mes anterior
+                            </p>
+</div>
+<div class="mt-4 h-16 w-full opacity-50 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-secondary-fixed to-transparent"></div>
+</div>
+<!-- Fines Card -->
+<div class="bg-error-container text-on-error-container p-6 rounded-lg border border-error shadow-sm flex flex-col justify-between h-full">
+<div>
+<p class="font-label-caps text-label-caps opacity-80 mb-2">MULTAS AUTOMATIZADAS (MXN)</p>
+<h4 class="font-display-lg text-display-lg-mobile md:text-display-lg mb-1">$85,200</h4>
+<p class="font-body-sm text-body-sm text-error flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                                -4.2% vs mes anterior
+                            </p>
+</div>
+<div class="mt-4 h-16 w-full opacity-30 bg-[linear-gradient(45deg,transparent_25%,rgba(186,26,26,0.2)_50%,transparent_75%,transparent_100%)] bg-[length:20px_20px]"></div>
+</div>
+</div>
+<!-- Trend Graph (Spans full width) -->
+<div class="lg:col-span-3 bg-surface rounded-lg border border-outline-variant p-6">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-primary">Tendencia: Ingresos vs Multas</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="font-body-sm text-body-sm">Suscripciones SaaS</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-error"></div>
+<span class="font-body-sm text-body-sm">Multas Acumuladas</span>
+</div>
+</div>
+</div>
+<!-- Simulated Graph Area -->
+<div class="relative h-[250px] w-full border-b border-l border-outline-variant flex items-end justify-between pt-4 px-2">
+<!-- Y Axis labels -->
+<div class="absolute -left-12 top-0 h-full flex flex-col justify-between text-on-surface-variant font-label-caps text-label-caps py-4">
+<span class="">$500k</span>
+<span class="">$250k</span>
+<span class="">0</span>
+</div>
+<!-- Horizontal Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between py-4 pointer-events-none">
+<div class="w-full h-px bg-outline-variant/30"></div>
+<div class="w-full h-px bg-outline-variant/30"></div>
+<div class="w-full h-px bg-outline-variant/30"></div>
+</div>
+<!-- Data Bars (Simulated) -->
+<div class="w-1/12 flex flex-col justify-end items-center gap-1 h-full z-10 group">
+<div class="w-full bg-primary hover:bg-primary-fixed-variant transition-colors" style="height: 60%"></div>
+<div class="w-full bg-error hover:bg-error-container transition-colors" style="height: 15%"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2">LUN</span>
+</div>
+<div class="w-1/12 flex flex-col justify-end items-center gap-1 h-full z-10">
+<div class="w-full bg-primary hover:bg-primary-fixed-variant transition-colors" style="height: 65%"></div>
+<div class="w-full bg-error hover:bg-error-container transition-colors" style="height: 10%"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2">MAR</span>
+</div>
+<div class="w-1/12 flex flex-col justify-end items-center gap-1 h-full z-10">
+<div class="w-full bg-primary hover:bg-primary-fixed-variant transition-colors" style="height: 80%"></div>
+<div class="w-full bg-error hover:bg-error-container transition-colors" style="height: 25%"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2">MIE</span>
+</div>
+<div class="w-1/12 flex flex-col justify-end items-center gap-1 h-full z-10">
+<div class="w-full bg-primary hover:bg-primary-fixed-variant transition-colors" style="height: 70%"></div>
+<div class="w-full bg-error hover:bg-error-container transition-colors" style="height: 20%"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2">JUE</span>
+</div>
+<div class="w-1/12 flex flex-col justify-end items-center gap-1 h-full z-10">
+<div class="w-full bg-primary hover:bg-primary-fixed-variant transition-colors" style="height: 90%"></div>
+<div class="w-full bg-error hover:bg-error-container transition-colors" style="height: 30%"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2">VIE</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 h-[80px] bg-primary text-on-primary border-t-2 border-secondary shadow-[0_-2px_0px_0px_rgba(0,0,0,0.1)] flex justify-around items-center px-4 pb-2">
+<a class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 w-16 h-12" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="font-label-caps text-[10px] mt-1">Mapa</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 w-16 h-12" href="#">
+<span class="material-symbols-outlined">directions_bus</span>
+<span class="font-label-caps text-[10px] mt-1">Flota</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary text-on-secondary rounded-xl min-w-[64px] min-h-[48px] active:scale-90 duration-75" href="#">
+<span class="material-symbols-outlined filled">payments</span>
+<span class="font-label-caps text-[10px] mt-1">Finanzas</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-primary/80 hover:bg-primary-fixed-variant active:scale-90 duration-75 w-16 h-12" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="font-label-caps text-[10px] mt-1">Perfil</span>
+</a>
+</nav>
+
+
+</body></html>

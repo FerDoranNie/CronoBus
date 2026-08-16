@@ -1,0 +1,6 @@
+{
+  "name": "CronoBus",
+  "description": "Sistema Integral de Control de Rutas y Despacho Digital para Transporte Concesionado",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
