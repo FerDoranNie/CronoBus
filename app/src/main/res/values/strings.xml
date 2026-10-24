@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">CronoBus</string>
+    <string name="location_tracking_channel_name">Rastreo de turno</string>
+    <string name="location_tracking_channel_description">Mantiene el GPS activo y visible mientras el turno está en curso.</string>
+    <string name="location_tracking_title">CronoBus · Turno activo</string>
+    <string name="location_tracking_text">Rastreo GPS en segundo plano activo</string>
+    <string name="location_tracking_stop">Detener rastreo</string>
 </resources>

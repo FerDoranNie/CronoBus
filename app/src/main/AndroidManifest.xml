@@ -35,6 +35,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Rastreo GPS de turno. El tipo "location" es obligatorio desde Android 14 para poder
+            mantener el rastreo con la pantalla apagada; requiere FOREGROUND_SERVICE_LOCATION
+            (declarado arriba) y ACCESS_FINE_LOCATION concedido en tiempo de ejecución.
+        -->
+        <service
+            android:name="com.cronobus.app.service.LocationTrackingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false" />
+
+        <!-- Acción "Detener rastreo" de la notificación persistente. -->
+        <receiver
+            android:name="com.cronobus.app.service.LocationTrackingActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
