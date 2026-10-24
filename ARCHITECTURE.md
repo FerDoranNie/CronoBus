@@ -96,23 +96,43 @@ app/src/main/java/com/cronobus/app/
 │       └── TransitRepository.kt     # Fuente única de verdad (Offline-First)
 ├── domain/
 │   ├── location/
-│   │   ├── KalmanLocationFilter.kt  # Filtro de ruido GPS urbano
-│   │   ├── GeofenceEngine.kt        # Evaluación de geocercas con histéresis
-│   │   └── TamperDetector.kt        # Detección de Mock GPS y apagados sospechosos
-│   ├── model/                       # Modelos de dominio inmutables
+│   │   ├── GeoMath.kt               # Haversine, proyección local WGS-84 y Ray-Casting
+│   │   ├── KalmanLocationFilter.kt  # Filtro de ruido GPS urbano 2D
+│   │   └── GeofenceEngine.kt        # Evaluación de geocercas con histéresis (5s)
+│   ├── security/
+│   │   └── TamperDetector.kt        # Detección de Mock GPS, reloj y apagados sospechosos
+│   ├── model/                       # GeoPoint, LocationSample, LocationUpdate, GeofenceModels, TamperModels
 │   └── usecase/
 │       ├── EvaluateForceMajeureUseCase.kt # Regla: >=3 reportes en <500m y <15min
 │       ├── CalculateHeadwayUseCase.kt     # Cálculo de intervalo delantero/trasero
 │       └── ExportFinancialCsvUseCase.kt   # Exportación real de métricas SaaS + Multas
 ├── service/
-│   ├── LocationTrackingService.kt   # ForegroundService para rastreo continuo en ruta
-│   └── SyncManager.kt               # Motor Store & Forward reactivo a red
+│   ├── LocationTrackingService.kt         # ForegroundService para rastreo continuo en ruta
+│   ├── LocationTrackingActionReceiver.kt  # BroadcastReceiver para acción "Detener" en notificación
+│   └── StoreAndForwardSyncManager.kt      # Motor Store & Forward reactivo a red
 └── ui/
-    ├── theme/                       # Tokens Classic Signal (#0a0a0a, #0b6c4b, #ffba38)
+    ├── theme/                       # Tokens Classic Signal (#0a0a0a, #0b6c4b, #ffba38) y Dark Mode
     └── components/                  # Diálogos nativos (Consentimiento LFT, Cámara Apelación)
 ```
 
-### 3.2 Esquema de Base de Datos Local (`Room`) para *Store & Forward*
+### 3.2 Contratos del Motor de Ubicación y Anti-Sabotaje (Auditados en Semana 1)
+
+1. **`LocationTrackingService.start(context: Context): Boolean`**
+   - **Precondición Android 12–16 (SDK 31–36):** Debe invocarse con la app en primer plano y únicamente cuando `hasLocationPermission(context)` (`ACCESS_FINE_LOCATION`) está concedido.
+   - **Valor de retorno:** Devuelve `true` si el sistema aceptó el arranque de `startForegroundService`; devuelve `false` (sin lanzar excepción) si falta el permiso `ACCESS_FINE_LOCATION` o si Android rechaza el inicio con `ForegroundServiceStartNotAllowedException` / `IllegalStateException`.
+   - **Cierre seguro (`acceptingFixes` + `DiscardPolicy`):** Ante una alerta bloqueante (`MOCK_LOCATION` o `CLOCK_MANIPULATION`) o `onDestroy()`, la compuerta `@Volatile acceptingFixes` se baja inmediatamente en el hilo `cronobus-gps` y la parada del servicio se delega al `mainHandler`, mientras el `ThreadPoolExecutor` de un solo hilo usa `DiscardPolicy` para absorber callbacks residuales de Play Services sin lanzar `RejectedExecutionException`.
+
+2. **Semántica de `Double.NaN` para `speedMps` y `bearingDegrees` en [`LocationSample`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/model/LocationSample.kt)**
+   - Cuando `android.location.Location.hasSpeed()` o `hasBearing()` es `false`, `Location.toSample()` envía `Double.NaN` (nunca `0.0`).
+   - **En [`KalmanLocationFilter`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/location/KalmanLocationFilter.kt):**
+     - `sample.speedMps = Double.NaN` impide disparar falsas detecciones de maniobra (`isManeuver = sample.speedMps.isFinite() && ...`), evitando inflar artificialmente la matriz de ruido de proceso $Q$ cuando el proveedor omite velocidad.
+     - `sample.bearingDegrees = Double.NaN` en `initialize()` fija el vector de velocidad inicial $(v_{\text{Norte}}, v_{\text{Este}}) = (0.0, 0.0)$, evitando evaluar `cos(NaN)` / `sin(NaN)` que contaminaría con `NaN` el vector de estado $x$ y la matriz de covarianza $P$.
+     - Las salidas publicadas en [`LocationUpdate`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/model/LocationUpdate.kt) garantizan siempre valores finitos (`isFinite() == true`).
+
+3. **Ancla de Reloj del Sistema vs. Reloj Monotónico en [`TamperDetector`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/security/TamperDetector.kt)**
+   - La detección de `CLOCK_MANIPULATION` compara el avance de `wallClockNowMs()` (`System.currentTimeMillis()`) contra `monotonicNowNanos()` (`SystemClock.elapsedRealtimeNanos()`) entre inspecciones consecutivas, en lugar de usar `Location.time` (`wallClockEpochMs`), evitando falsos positivos cuando `FusedLocationProviderClient` alterna entre proveedores GNSS y de red.
+
+### 3.3 Esquema de Base de Datos Local (`Room`) para *Store & Forward*
 Todas las tablas operativas incluyen metadatos de sincronización para garantizar cero pérdida de datos en zonas sin cobertura:
 - `id`: `UUID` generado localmente.
 - `recordedAtEpochMs`: Timestamp monotónico validado contra reloj GPS.
@@ -120,7 +140,7 @@ Todas las tablas operativas incluyen metadatos de sincronización para garantiza
 - `retryCount`: Contador de intentos para *Exponential Backoff*.
 - `isMockDetected`: Flag de auditoría anti-sabotaje.
 
-### 3.3 Algoritmo de Exención Automática por Fuerza Mayor
+### 3.4 Algoritmo de Exención Automática por Fuerza Mayor
 1. Cada vez que una unidad registra un `IncidenceReport` de tipo `TRAFFIC` o `BLOCKADE`, se almacena con sus coordenadas $(lat_i, lng_i)$ y timestamp $t_i$.
 2. `EvaluateForceMajeureUseCase` busca reportes activos en la misma ruta tales que:
    $$\text{distancia\_haversine}(P_{\text{nuevo}}, P_i) \le 500\text{ m} \quad \text{y} \quad |t_{\text{nuevo}} - t_i| \le 15\text{ min}$$

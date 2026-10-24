@@ -33,18 +33,18 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 
 ---
 
-## 🛰️ Fase 2: Motor GPS Nativo, Filtro de Kalman y Geocercas
+## 🛰️ Fase 2: Motor GPS Nativo, Filtro de Kalman y Geocercas (Completado en Semana 1)
 - [x] **2.1 Descomentar y Configurar Play Services Location:** Activar `libs.play.services.location`, `libs.accompanist.permissions`, DataStore y CameraX en `app/build.gradle.kts`.
-- [ ] **2.2 Servicio de Ubicación en Primer Plano (`LocationTrackingService`):**
-  - Implementar `ForegroundService` con notificación persistente del turno activo para evitar que Android mate el rastreo cuando el chofer apague la pantalla o cambie de app.
-- [ ] **2.3 Filtro de Kalman 2D (`KalmanLocationFilter.kt`):**
-  - Implementar suavizado de coordenadas $(lat, lng, velocidad, accuracy)$ para mitigar saltos por "cañón urbano".
-- [ ] **2.4 Motor de Geocercas Poligonales y Circulares (`GeofenceEngine.kt`):**
-  - Detección matemática de entrada/salida (Haversine + Ray-Casting para polígonos) con histéresis de tiempo (permanencia mínima de 5s) para evitar lecturas dobles.
-- [ ] **2.5 Detector Anti-Sabotaje (`TamperDetectionManager.kt`):**
+- [x] **2.2 Servicio de Ubicación en Primer Plano (`LocationTrackingService`):**
+  - Implementar `ForegroundService` (`foregroundServiceType="location"`) con notificación persistente del turno activo, acción de parada (`LocationTrackingActionReceiver`), compuerta `@Volatile acceptingFixes` y contrato seguro `start(context): Boolean`.
+- [x] **2.3 Filtro de Kalman 2D (`KalmanLocationFilter.kt`):**
+  - Implementar suavizado de coordenadas $(lat, lng, v_{\text{Norte}}, v_{\text{Este}})$ con manejo seguro de `Double.NaN` en velocidad/rumbo, rechazo de *teleports* y re-anclaje automático.
+- [x] **2.4 Motor de Geocercas Poligonales y Circulares (`GeofenceEngine.kt` + `GeoMath.kt`):**
+  - Detección matemática de entrada/salida (Haversine + Ray-Casting para polígonos) con histéresis temporal de permanencia mínima (`dwellMillis = 5000L`) y banda muerta de salida (`exitHysteresisMeters = 10.0`).
+- [x] **2.5 Detector Anti-Sabotaje (`TamperDetector.kt`):**
   - Detectar `Location.isMock()` / `isFromMockProvider()`.
-  - Detectar apagado manual del proveedor GPS o modo avión recurrente a menos de 300m de un punto de control.
-  - Registrar nivel de batería al momento de desconexión para distinguir descarga real vs. apagado inducido.
+  - Detectar manipulación del reloj del dispositivo comparando `wallClockNowMs` vs. `elapsedRealtimeNanos`.
+  - Detectar apagado sospechoso del proveedor GPS a $\le 300\text{ m}$ de un punto de control con batería $> 15\%$.
 
 ---
 
@@ -80,10 +80,13 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 
 ## 🧪 Fase 5: Pruebas Automatizadas, Auditoría y QA
 - [ ] **5.1 Pruebas Unitarias (JUnit 4 + Coroutines Test):**
-  - Tests para `KalmanLocationFilter`, `GeofenceEngine`, regla de exención por fuerza mayor (3 unidades / 500m / 15m) y cálculo de headway/multas.
+  - [x] Tests para `KalmanLocationFilter` (`KalmanLocationFilterTest`, `KalmanRobustnessTest`), `GeofenceEngine` (`GeofenceEngineTest`) y `TamperDetector` (`TamperDetectorTest`, `TamperClockSourceTest`) — **31 pruebas en verde**.
+  - [ ] Tests para regla de exención por fuerza mayor (3 unidades / 500m / 15m) y cálculo de headway/multas.
 - [ ] **5.2 Pruebas de Base de Datos y Store & Forward (Robolectric + Room):**
   - Validar encolado sin red, persistencia tras reinicio y vaciado ordenado al reconectar.
 - [ ] **5.3 Pruebas de Regresión Visual (Roborazzi):**
-  - Actualizar [`GreetingScreenshotTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/example/GreetingScreenshotTest.kt) hacia tests de captura de pantalla reales (`CronoBusScreenshotTest.kt`) para las vistas principales.
+  - [x] Migrar [`GreetingScreenshotTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/GreetingScreenshotTest.kt) a `com.cronobus.app` con tema *Classic Signal*.
+  - [ ] Expandir capturas de pantalla para las vistas principales.
 - [ ] **5.4 Verificación de Build & Lint:**
-  - `./gradlew lintDebug`, `./gradlew testDebugUnitTest` y `./gradlew assembleDebug` sin warnings críticos ni errores.
+  - [x] Semana 1: `./gradlew testDebugUnitTest assembleDebug` en verde (49 tareas ejecutadas, 31 tests OK).
+  - [ ] Cierre final: `./gradlew lintDebug`, `./gradlew testDebugUnitTest` y `./gradlew assembleDebug` sin warnings críticos ni errores.
