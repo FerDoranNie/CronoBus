@@ -46,12 +46,78 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <script>
+    console.log("CronoBus HTML script starting...");
+    // Global error handling for WebView debugging
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errorMsg = "JS Error: " + message + " at " + source + ":" + lineno;
+      console.error(errorMsg);
+      const errorDiv = document.getElementById('critical-error-banner');
+      if (errorDiv) {
+        errorDiv.innerText = errorMsg;
+        errorDiv.style.display = 'block';
+      }
+      return false;
+    };
+
+    // Check if Tailwind loaded
+    window.addEventListener('load', () => {
+      console.log("CronoBus HTML window loaded.");
+      if (typeof tailwind === 'undefined') {
+        console.warn("Tailwind CDN failed to load. Using fallback styles.");
+        document.body.classList.add('tailwind-fallback');
+      }
+      if (typeof L === 'undefined') {
+        console.error("Leaflet failed to load. Maps will not work.");
+        const errorDiv = document.getElementById('critical-error-banner');
+        if (errorDiv) {
+          errorDiv.innerText = "Error: Leaflet (Mapas) no cargó. Verifica tu conexión.";
+          errorDiv.style.display = 'block';
+        }
+      }
+    });
+  </script>
+
   <!-- Google Fonts: Inter -->
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    body { font-family: 'Inter', sans-serif; background-color: #f9f9f9; color: #1a1c1c; margin: 0; }
+    html, body {
+      height: 100%;
+      height: -webkit-fill-available;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f9f9f9;
+      color: #1a1c1c;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+
+    /* Fallback styles when Tailwind fails */
+    .tailwind-fallback .bg-primary { background-color: #0a0a0a; }
+    .tailwind-fallback .text-white { color: #ffffff; }
+    .tailwind-fallback .flex { display: flex; }
+    .tailwind-fallback .flex-col { flex-direction: column; }
+    .tailwind-fallback .h-screen { height: 100vh; }
     
+    #critical-error-banner {
+      display: none;
+      background-color: #ba1a1a;
+      color: white;
+      padding: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      z-index: 9999;
+    }
+
     /* Utilitarian Components */
     .card { background-color: #ffffff; border: 1px solid #c4c7c7; border-radius: 8px; }
     .btn { border-radius: 4px; font-weight: 600; padding: 0.5rem 1rem; border: 1px solid #c4c7c7; transition: all 0.2s; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
@@ -68,11 +134,92 @@
     .pill-red { background-color: #ffdad6; color: #93000a; border-color: #ba1a1a; }
     
     /* Layout & Tabs */
-    .view-content { display: none; }
-    .view-content.active { display: block; }
+    main {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-height: 0;
+      background-color: #f9f9f9;
+    }
+
+    .view-content {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .view-content.active { display: flex; }
     
     #view-admin.active { display: grid; }
-    
+
+    /* Refactored Layout Styles */
+    .driver-container {
+      max-width: 500px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    /* Card overrides to ensure visibility without Tailwind */
+    .status-card-green {
+      background-color: #a0f4ca !important;
+      border: 1px solid #0b6c4b;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .status-card-amber {
+      background-color: #2f1e00 !important;
+      border: 1px solid #ffba38;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .info-card {
+      background-color: #ffffff !important;
+      border: 1px solid #c4c7c7;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .action-btn {
+      background-color: #eeeeee !important;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #c4c7c7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
     /* Map Styles */
     #map-admin, #map-public { z-index: 1; }
     .leaflet-popup-content-wrapper { border-radius: 8px; border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); font-family: 'Inter', sans-serif;}
@@ -85,7 +232,8 @@
     ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
   </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden">
+<body class="flex flex-col h-full bg-surface">
+  <div id="critical-error-banner"></div>
 
   <!-- Top Header -->
   <header class='bg-[#0a0a0a] text-white px-4 py-3 flex justify-between items-center shrink-0 z-50 relative'>
@@ -110,33 +258,33 @@
   </nav>
 
   <!-- Main Workspace -->
-  <main class="flex-1 relative overflow-hidden bg-surface pb-[72px]">
+  <main>
     
     <!-- ================= VIEW A: DRIVER MOBILE ================= -->
-    <div id="view-driver" class="view-content active h-full overflow-y-auto p-4 md:p-6 lg:p-8">
-      <div class="max-w-md mx-auto flex flex-col gap-3">
+    <div id="view-driver" class="view-content active">
+      <div class="driver-container">
         
         <!-- Driver Header -->
-        <div class="flex justify-between items-center shrink-0 mb-1">
+        <div class="flex justify-between items-center mb-1">
           <div class="flex flex-col">
             <span class="text-lg font-bold text-[#1a1c1c] leading-tight">Ruta 42 - Ramal Centro</span>
             <span class="text-xs font-medium text-[#444748]">Unidad #14 • Op: J. Pérez</span>
           </div>
-          <div id="driver-signal-badge" class="bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+          <div id="driver-signal-badge" class="pill-green px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase">
             <span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE
           </div>
         </div>
 
         <!-- Dispatch & Headway -->
-        <div class='grid grid-cols-2 gap-3 shrink-0 mb-1'>
-          <div class='bg-[#a0f4ca] border border-[#0b6c4b] rounded-lg p-3 flex flex-col justify-between min-h-[90px]'>
+        <div class='grid-2'>
+          <div class='status-card-green'>
             <span class='text-[10px] font-bold uppercase text-[#177251]'>Headway (Intervalo)</span>
             <div class='flex flex-col'>
               <span id="driver-headway" class='text-2xl font-mono font-black text-[#0b6c4b]'>-02:30 min</span>
               <span class='text-[10px] font-medium text-[#177251]'>Distancia Óptima</span>
             </div>
           </div>
-          <div class='bg-[#2f1e00] border border-[#ffba38] rounded-lg p-3 flex flex-col justify-between min-h-[90px]'>
+          <div class='status-card-amber'>
             <span class='text-[10px] font-bold uppercase text-[#ffba38]'>Próx. Salida</span>
             <div class='flex flex-col'>
               <span class='text-2xl font-mono font-black text-[#ffba38]'>02:15</span>
@@ -146,12 +294,12 @@
         </div>
 
         <!-- Checkpoint Monitor (Geofences) -->
-        <div class='bg-white border border-[#c4c7c7] rounded-lg flex flex-col overflow-hidden mb-1'>
+        <div class='info-card'>
           <div class='px-3 py-2 bg-[#eeeeee] border-b border-[#c4c7c7] flex justify-between items-center'>
             <span class='text-[11px] font-bold uppercase text-[#444748]'>Checador Digital</span>
             <span class='text-[10px] font-mono text-[#444748]'>Progreso: 2/4</span>
           </div>
-          <div class='flex-1 px-3 py-2 space-y-1'>
+          <div class='px-3 py-2 space-y-1'>
             <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee] opacity-40'>
               <div class='w-5 h-5 rounded-sm bg-[#0b6c4b] flex items-center justify-center text-white text-[10px]'>✓</div>
               <div class='flex-1'>
@@ -187,27 +335,27 @@
         </div>
 
         <!-- Quick Actions & Reporting -->
-        <div class='grid grid-cols-4 gap-2 shrink-0 mb-1'>
-          <button onclick="reportIncidence('Trafico')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+        <div class='grid-4'>
+          <button onclick="reportIncidence('Trafico')" class='action-btn active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
             <span class='text-lg'>⚠️</span>
             <span class='text-[9px] font-bold uppercase'>Tráfico</span>
           </button>
-          <button onclick="reportIncidence('Bloqueo')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+          <button onclick="reportIncidence('Bloqueo')" class='action-btn active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
             <span class='text-lg'>🛑</span>
             <span class='text-[9px] font-bold uppercase'>Bloqueo</span>
           </button>
-          <button onclick="setOccupancy('Media')" class='flex flex-col items-center justify-center gap-1 bg-[#eeeeee] p-2 rounded-md border border-[#c4c7c7] active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
+          <button onclick="setOccupancy('Media')" class='action-btn active:bg-[#0a0a0a] active:text-white transition-colors text-[#1a1c1c]'>
             <span class='text-lg'>👥</span>
             <span class='text-[9px] font-bold uppercase'>Aforo (Med)</span>
           </button>
-          <button onclick="setOccupancy('Lleno')" class='flex flex-col items-center justify-center gap-1 bg-[#ffdad6] p-2 rounded-md border border-[#ba1a1a] active:bg-[#ba1a1a] active:text-white group'>
+          <button onclick="setOccupancy('Lleno')" class='action-btn active:bg-[#0a0a0a] active:text-white group' style="background-color: #ffdad6 !important; border-color: #ba1a1a;">
             <span class='text-lg'>🚨</span>
             <span class='text-[9px] font-bold uppercase text-[#93000a] group-active:text-white'>Lleno</span>
           </button>
         </div>
 
         <!-- Incentives / Fines Panel -->
-        <div class='bg-[#0a0a0a] text-white rounded-lg p-3 flex justify-between items-center shrink-0 mb-3'>
+        <div class='rounded-lg p-3 flex justify-between items-center mb-3' style="background-color: #0a0a0a; color: white;">
           <div class='flex flex-col'>
             <span class='text-[9px] uppercase opacity-60'>Bono Puntualidad (Hoy)</span>
             <span class='text-lg font-mono font-bold text-[#a0f4ca]'>+$45.00 MXN</span>
@@ -319,7 +467,7 @@
   </main>
 
   <!-- ================= SIMULATION CONTROLS (BOTTOM BAR) ================= -->
-  <footer class='bg-[#eeeeee] border-t border-[#c4c7c7] p-2 flex flex-wrap items-center justify-between gap-3 shrink-0 absolute bottom-0 w-full z-[2000] min-h-[56px]'>
+  <footer class='bg-[#eeeeee] border-t border-[#c4c7c7] p-2 flex flex-wrap items-center justify-between gap-3 shrink-0 relative w-full z-[2000] min-h-[56px]'>
     <div class='flex items-center gap-2'>
       <div class='bg-[#0a0a0a] px-3 py-1.5 rounded flex items-center gap-2'>
          <div class='w-2 h-2 bg-[#ffba38] rounded-full animate-pulse'></div>
@@ -582,12 +730,15 @@
 
     // Init
     window.onload = () => {
+      const mainEl = document.querySelector('main');
+      console.log("CronoBus Layout: window=" + window.innerHeight + " main=" + (mainEl ? mainEl.clientHeight : 'null'));
       // Setup initial nav style
       let firstBtn = document.querySelector('#nav-tabs button');
       firstBtn.classList.add('border-[#0b6c4b]', 'text-[#0b6c4b]');
       firstBtn.classList.remove('border-transparent', 'text-[#444748]');
 
       initMaps();
+      console.log("CronoBus logic initialized.");
       requestAnimationFrame(tick);
     }
   </script>
