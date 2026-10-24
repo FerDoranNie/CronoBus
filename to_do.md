@@ -16,7 +16,7 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 
 ## 🔧 Fase 1: Saneamiento de Configuración Android & Empaquetado Offline
 - [ ] **1.1 Identidad del Paquete:** Migrar `namespace` y `applicationId` de `com.example` a `com.cronobus.app` en [`app/build.gradle.kts`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/build.gradle.kts) y estructura de carpetas.
-- [ ] **1.2 Permisos en Manifiesto:** Declarar en [`AndroidManifest.xml`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/AndroidManifest.xml):
+- [x] **1.2 Permisos en Manifiesto:** Declarar en [`AndroidManifest.xml`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/AndroidManifest.xml):
   - `ACCESS_FINE_LOCATION` y `ACCESS_COARSE_LOCATION`
   - `ACCESS_BACKGROUND_LOCATION`
   - `FOREGROUND_SERVICE` y `FOREGROUND_SERVICE_LOCATION`
@@ -24,16 +24,17 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
   - `CAMERA` (para evidencia de apelación de multas)
   - `POST_NOTIFICATIONS` (para alertas de despacho y headway)
 - [ ] **1.3 Eliminación de Dependencias CDN Bloqueantes en WebView:**
-  - Empaquetar Tailwind compilado (CSS estático), fuente `Inter` y librería `Leaflet.js` localmente en `app/src/main/assets/` para que la app no falle al abrirse sin internet.
+  - [x] Empaquetar utilidades CSS offline de diseño (`classic_signal_offline.css`) en `app/src/main/assets/` para diseño 100% fiel sin conexión.
+  - [ ] Empaquetar librería `Leaflet.js` localmente en `app/src/main/assets/`.
 - [ ] **1.4 Endurecimiento de Seguridad en WebView:**
   - Deshabilitar `allowFileAccess = true` innecesario, implementar `WebViewAssetLoader` (`https://appassets.androidplatform.net/`) y restringir `MIXED_CONTENT_ALWAYS_ALLOW`.
-- [ ] **1.5 Tema Compose Classic Signal:**
+- [x] **1.5 Tema Compose Classic Signal:**
   - Reemplazar los colores por defecto (`Purple80`, `Pink40`) en [`Color.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/example/ui/theme/Color.kt) y [`Theme.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/example/ui/theme/Theme.kt) por los tokens oficiales de **Classic Signal** y **CronoBus Dark Mode**.
 
 ---
 
 ## 🛰️ Fase 2: Motor GPS Nativo, Filtro de Kalman y Geocercas
-- [ ] **2.1 Descomentar y Configurar Play Services Location:** Activar `libs.play.services.location` y `libs.accompanist.permissions` en `app/build.gradle.kts`.
+- [x] **2.1 Descomentar y Configurar Play Services Location:** Activar `libs.play.services.location`, `libs.accompanist.permissions`, DataStore y CameraX en `app/build.gradle.kts`.
 - [ ] **2.2 Servicio de Ubicación en Primer Plano (`LocationTrackingService`):**
   - Implementar `ForegroundService` con notificación persistente del turno activo para evitar que Android mate el rastreo cuando el chofer apague la pantalla o cambie de app.
 - [ ] **2.3 Filtro de Kalman 2D (`KalmanLocationFilter.kt`):**
