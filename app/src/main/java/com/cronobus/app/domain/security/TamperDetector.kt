@@ -22,7 +22,8 @@ import kotlin.math.abs
  * Es Kotlin puro: los relojes y la batería se inyectan, lo que permite probarlo en JVM sin Android.
  *
  * @param monotonicNowNanos En Android: `{ SystemClock.elapsedRealtimeNanos() }`.
- * @param wallClockNowMs En Android: `{ System.currentTimeMillis() }` (solo auditoría).
+ * @param wallClockNowMs En Android: `{ System.currentTimeMillis() }`. Se contrasta contra el reloj
+ *   monotónico entre fixes para detectar cambios manuales de hora del teléfono.
  */
 class TamperDetector(
     private val monotonicNowNanos: () -> Long,
@@ -45,10 +46,20 @@ class TamperDetector(
         val duplicateSuppressionMillis: Long = 60_000L,
     )
 
+    /**
+     * Ancla temporal del último fix aceptado.
+     *
+     * La detección de manipulación de reloj compara la hora de pared **del sistema**
+     * ([systemWallClockMs], vía [wallClockNowMs]) contra el reloj monotónico ([inspectedAtMonotonicNanos])
+     * entre inspecciones. No se usa `Location.time` porque el proveedor fusionado mezcla hora GNSS
+     * y hora de red/sistema según la fuente activa, lo que provocaba falsos positivos bloqueantes
+     * al alternar GPS ↔ red con el reloj del teléfono desfasado (sin manipulación real).
+     */
     private data class FixAnchor(
         val position: GeoPoint,
         val monotonicNanos: Long,
-        val wallClockEpochMs: Long,
+        val inspectedAtMonotonicNanos: Long,
+        val systemWallClockMs: Long,
     )
 
     private var lastAcceptedFix: FixAnchor? = null
@@ -112,11 +123,12 @@ class TamperDetector(
             }
         }
 
+        val nowWallMs = wallClockNowMs()
         val previous = lastAcceptedFix
-        if (previous != null && sample.elapsedRealtimeNanos > previous.monotonicNanos) {
-            val wallDeltaMillis = sample.wallClockEpochMs - previous.wallClockEpochMs
+        if (previous != null && nowNanos > previous.inspectedAtMonotonicNanos) {
+            val wallDeltaMillis = nowWallMs - previous.systemWallClockMs
             val monotonicDeltaMillis =
-                (sample.elapsedRealtimeNanos - previous.monotonicNanos) / NANOS_PER_MILLI
+                (nowNanos - previous.inspectedAtMonotonicNanos) / NANOS_PER_MILLI
             val driftMillis = wallDeltaMillis - monotonicDeltaMillis
             if (abs(driftMillis) > config.maxClockDriftMillis) {
                 rawEvents += buildEvent(
@@ -135,7 +147,8 @@ class TamperDetector(
             lastAcceptedFix = FixAnchor(
                 position = sample.position,
                 monotonicNanos = sample.elapsedRealtimeNanos,
-                wallClockEpochMs = sample.wallClockEpochMs,
+                inspectedAtMonotonicNanos = nowNanos,
+                systemWallClockMs = nowWallMs,
             )
         }
 

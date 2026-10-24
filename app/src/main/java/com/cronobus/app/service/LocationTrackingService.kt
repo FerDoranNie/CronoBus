@@ -15,7 +15,9 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -30,7 +32,7 @@ import com.cronobus.app.domain.model.GeofenceZone
 import com.cronobus.app.domain.model.LocationSample
 import com.cronobus.app.domain.model.LocationUpdate
 import com.cronobus.app.domain.model.TamperEvent
-import com.example.R
+import com.cronobus.app.R
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationCallback
@@ -39,7 +41,9 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -76,6 +80,7 @@ class LocationTrackingService : Service() {
     private lateinit var executor: ExecutorService
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val kalmanFilter = KalmanLocationFilter()
     private val geofenceEngine = GeofenceEngine(nowNanos = { SystemClock.elapsedRealtimeNanos() })
@@ -83,9 +88,20 @@ class LocationTrackingService : Service() {
         monotonicNowNanos = { SystemClock.elapsedRealtimeNanos() },
     )
 
+    /** Solo se modifica en el hilo principal (onStartCommand / onDestroy / mainHandler). */
     private var trackingStarted = false
+
+    /**
+     * Compuerta leída desde el hilo `cronobus-gps`. Se baja *antes* de programar la parada para
+     * que ningún fix en cola llegue al filtro/geocercas tras una alerta bloqueante o el cierre.
+     */
+    @Volatile
+    private var acceptingFixes = false
+
     private var batteryRegistered = false
     private var zonesJob: Job? = null
+
+    @Volatile
     private var providerUnavailableSinceNanos = 0L
 
     private val locationCallback = object : LocationCallback() {
@@ -126,9 +142,18 @@ class LocationTrackingService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        executor = Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "cronobus-gps")
-        }
+        // Un solo hilo serializa filtro + geocercas. DiscardPolicy: tras `shutdown()` los callbacks
+        // que Play Services aún entregue (removeLocationUpdates es asíncrono) se descartan en lugar
+        // de lanzar RejectedExecutionException en un hilo binder de GMS.
+        executor = ThreadPoolExecutor(
+            1,
+            1,
+            0L,
+            TimeUnit.MILLISECONDS,
+            LinkedBlockingQueue(),
+            { runnable -> Thread(runnable, "cronobus-gps") },
+            ThreadPoolExecutor.DiscardPolicy(),
+        )
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
     }
 
@@ -149,6 +174,8 @@ class LocationTrackingService : Service() {
 
             else -> {
                 Log.w(TAG, "Acción desconocida: ${intent.action}")
+                // No dejar un servicio "zombi" sin notificación si esta fue la intent que lo creó.
+                if (!trackingStarted) stopSelf()
                 return START_NOT_STICKY
             }
         }
@@ -159,8 +186,9 @@ class LocationTrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        mainHandler.removeCallbacksAndMessages(null)
         stopTracking()
-        if (!executor.isShutdown) executor.shutdown()
+        if (::executor.isInitialized && !executor.isShutdown) executor.shutdown()
         scope.cancel()
         super.onDestroy()
     }
@@ -172,6 +200,7 @@ class LocationTrackingService : Service() {
     private fun startTracking() {
         if (trackingStarted) return
         trackingStarted = true
+        acceptingFixes = true
         _isRunning.value = true
 
         registerBatteryMonitor()
@@ -188,9 +217,13 @@ class LocationTrackingService : Service() {
 
         try {
             fusedLocationClient.requestLocationUpdates(request, executor, locationCallback)
-            // Semilla inmediata para que la UI no espere el primer intervalo.
+            // Semilla inmediata para que la UI no espere el primer intervalo. Se descarta si es
+            // vieja: de lo contrario el TamperDetector emitiría una alerta STALE_FIX en cada
+            // arranque de turno con un caché de ubicación de horas atrás.
             fusedLocationClient.lastLocation.addOnSuccessListener(executor) { location ->
-                location?.let(::handleLocation)
+                if (location == null) return@addOnSuccessListener
+                val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+                if (ageNanos in 0L..SEED_MAX_AGE_NANOS) handleLocation(location)
             }
         } catch (security: SecurityException) {
             Log.e(TAG, "Permiso de ubicación revocado mientras el servicio estaba activo.", security)
@@ -204,6 +237,7 @@ class LocationTrackingService : Service() {
     }
 
     private fun stopTracking() {
+        acceptingFixes = false
         if (!trackingStarted) {
             _isRunning.value = false
             return
@@ -259,8 +293,9 @@ class LocationTrackingService : Service() {
     // Procesamiento de lecturas
     // ---------------------------------------------------------------------------------------------
 
+    /** Corre en el hilo `cronobus-gps`. */
     private fun handleLocation(location: Location) {
-        if (!trackingStarted) return
+        if (!acceptingFixes) return
         val sample = location.toSample()
 
         // 1) Anti-sabotaje: un fix manipulado nunca entra al filtro ni a las geocercas.
@@ -272,8 +307,14 @@ class LocationTrackingService : Service() {
                 "Rastreo interrumpido por anti-sabotaje: " +
                     tamperReport.events.joinToString { it.type.name },
             )
-            stopTracking()
-            stopSelf()
+            // Cerrar la compuerta ya y delegar la parada al hilo principal: stopTracking() muta
+            // estado del ciclo de vida (receiver, foreground, Job) que no debe tocarse en paralelo
+            // con onDestroy().
+            acceptingFixes = false
+            mainHandler.post {
+                stopTracking()
+                stopSelf()
+            }
             return
         }
         if (!tamperReport.acceptFix) return
@@ -290,7 +331,7 @@ class LocationTrackingService : Service() {
     }
 
     private fun handleProviderUnavailable() {
-        if (!trackingStarted) return
+        if (!acceptingFixes) return
         val nowNanos = SystemClock.elapsedRealtimeNanos()
         if (providerUnavailableSinceNanos == 0L) providerUnavailableSinceNanos = nowNanos
         // Gracia para no confundir un túnel o un cañón urbano con un apagado deliberado.
@@ -302,11 +343,15 @@ class LocationTrackingService : Service() {
             .forEach { _tamperAlerts.tryEmit(it) }
     }
 
+    /**
+     * Velocidad/rumbo ausentes se envían como NaN (no 0.0): un 0.0 falso hacía que el Kalman
+     * detectara "maniobras" continuas en un vehículo en marcha cuyo proveedor no reporta velocidad.
+     */
     private fun Location.toSample(): LocationSample = LocationSample(
         position = GeoPoint(latitude, longitude),
         accuracyMeters = if (hasAccuracy()) accuracy.toDouble() else UNKNOWN_ACCURACY_METERS,
-        speedMps = if (hasSpeed()) speed.toDouble() else 0.0,
-        bearingDegrees = if (hasBearing()) bearing.toDouble() else 0.0,
+        speedMps = if (hasSpeed()) speed.toDouble() else Double.NaN,
+        bearingDegrees = if (hasBearing()) bearing.toDouble() else Double.NaN,
         altitudeMeters = if (hasAltitude()) altitude else null,
         provider = provider,
         isMock = isMockProvider(),
@@ -402,6 +447,7 @@ class LocationTrackingService : Service() {
         private const val MIN_UPDATE_DISTANCE_METERS = 2f
         private const val UNKNOWN_ACCURACY_METERS = 30.0
         private const val PROVIDER_LOSS_GRACE_NANOS = 30_000L * 1_000_000L
+        private const val SEED_MAX_AGE_NANOS = 15_000L * 1_000_000L
 
         private val _updates = MutableSharedFlow<LocationUpdate>(
             replay = 1,
@@ -446,15 +492,29 @@ class LocationTrackingService : Service() {
             _geofenceZones.value = zones.toList()
         }
 
-        /** Debe invocarse con la app en primer plano (restricción de Android 12+). */
-        fun start(context: Context) {
+        /**
+         * Debe invocarse con la app en primer plano (restricción de Android 12+).
+         *
+         * Valida el permiso **antes** de `startForegroundService`: si el servicio arrancara sin
+         * permiso no podría llamar a `startForeground(type=location)` (SecurityException en 14+)
+         * y el sistema lo mataría con `ForegroundServiceDidNotStartInTimeException`.
+         *
+         * @return `true` si se solicitó el arranque.
+         */
+        fun start(context: Context): Boolean {
+            if (!hasLocationPermission(context)) {
+                Log.w(TAG, "start() ignorado: falta ACCESS_FINE_LOCATION.")
+                return false
+            }
             val intent = Intent(context, LocationTrackingService::class.java)
                 .setAction(ACTION_START)
-            try {
+            return try {
                 ContextCompat.startForegroundService(context, intent)
+                true
             } catch (illegal: IllegalStateException) {
                 // Incluye ForegroundServiceStartNotAllowedException (Android 12+).
                 Log.e(TAG, "No se pudo iniciar el rastreo en primer plano.", illegal)
+                false
             }
         }
 

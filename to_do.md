@@ -15,7 +15,7 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 ---
 
 ## 🔧 Fase 1: Saneamiento de Configuración Android & Empaquetado Offline
-- [ ] **1.1 Identidad del Paquete:** Migrar `namespace` y `applicationId` de `com.example` a `com.cronobus.app` en [`app/build.gradle.kts`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/build.gradle.kts) y estructura de carpetas.
+- [x] **1.1 Identidad del Paquete:** Migrar `namespace` y `applicationId` de `com.example` a `com.cronobus.app` en [`app/build.gradle.kts`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/build.gradle.kts) y estructura de carpetas.
 - [x] **1.2 Permisos en Manifiesto:** Declarar en [`AndroidManifest.xml`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/AndroidManifest.xml):
   - `ACCESS_FINE_LOCATION` y `ACCESS_COARSE_LOCATION`
   - `ACCESS_BACKGROUND_LOCATION`

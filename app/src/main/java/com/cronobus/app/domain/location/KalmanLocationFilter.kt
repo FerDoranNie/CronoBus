@@ -113,14 +113,17 @@ class KalmanLocationFilter(
         consecutiveRejections = 0
 
         val estimatedSpeed = hypot(state[VELOCITY_NORTH], state[VELOCITY_EAST])
-        val isManeuver = abs(sample.speedMps - estimatedSpeed) > config.maneuverSpeedThresholdMps
+        // Velocidad desconocida (NaN) nunca dispara maniobra: evita inflar Q sin evidencia.
+        val isManeuver = sample.speedMps.isFinite() &&
+            abs(sample.speedMps - estimatedSpeed) > config.maneuverSpeedThresholdMps
         predict(
             deltaSeconds = deltaSeconds,
             noiseScale = if (isManeuver) config.maneuverNoiseBoost else 1.0,
         )
         if (!applyMeasurement(sample.position, accuracy)) {
-            initialized = false
-            return null
+            // Matriz singular o estado NaN: re-anclar sobre la lectura (ya validada) en lugar de
+            // perder el fix y dejar `latest` apuntando a un estado corrupto.
+            return initialize(sample, accuracy)
         }
 
         lastAcceptedMonoNanos = sample.elapsedRealtimeNanos
@@ -147,9 +150,16 @@ class KalmanLocationFilter(
         } else {
             0.0
         }
-        val bearingRadians = Math.toRadians(GeoMath.normalizeDegrees(sample.bearingDegrees))
-        state[VELOCITY_NORTH] = reportedSpeed * cos(bearingRadians)
-        state[VELOCITY_EAST] = reportedSpeed * sin(bearingRadians)
+        // Sin rumbo confiable (NaN/∞) la velocidad inicial se fija en 0: 0 · cos(NaN) sería NaN y
+        // envenenaría todo el estado del filtro.
+        if (sample.bearingDegrees.isFinite()) {
+            val bearingRadians = Math.toRadians(GeoMath.normalizeDegrees(sample.bearingDegrees))
+            state[VELOCITY_NORTH] = reportedSpeed * cos(bearingRadians)
+            state[VELOCITY_EAST] = reportedSpeed * sin(bearingRadians)
+        } else {
+            state[VELOCITY_NORTH] = 0.0
+            state[VELOCITY_EAST] = 0.0
+        }
 
         covariance.forEach { it.fill(0.0) }
         val metersPerLat = GeoMath.metersPerDegreeLatitude(state[LATITUDE])
@@ -278,8 +288,11 @@ class KalmanLocationFilter(
 
         val bearing = if (speed >= config.minBearingSpeedMps) {
             GeoMath.normalizeDegrees(Math.toDegrees(atan2(state[VELOCITY_EAST], state[VELOCITY_NORTH])))
-        } else {
+        } else if (sample.bearingDegrees.isFinite()) {
             GeoMath.normalizeDegrees(sample.bearingDegrees)
+        } else {
+            // Detenido y sin rumbo del proveedor: conservar el último rumbo publicado.
+            latestUpdate?.bearingDegrees ?: 0.0
         }
 
         val metersPerLat = GeoMath.metersPerDegreeLatitude(state[LATITUDE])
