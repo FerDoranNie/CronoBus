@@ -250,6 +250,9 @@
         <span data-sync-queue-dot class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
         <span data-sync-queue-text>SYNC: 0 PEND</span>
       </div>
+      <button id="btn-dark-mode-toggle" type="button" class="px-2.5 py-1 text-xs font-bold bg-[#212121] text-[#ffba38] border border-[#444748] rounded hover:bg-[#333333] transition-colors" title="Alternar Modo Nocturno" style="border: 1px solid #444748; background-color: #212121; color: #ffba38; cursor: pointer;">
+        🌙 Modo Noche
+      </button>
       <div class='flex flex-col items-end'>
         <span class='text-[10px] uppercase opacity-60'>Despacho</span>
         <span class='font-mono font-bold text-sm'>Central</span>
@@ -393,6 +396,15 @@
       <div class="col-span-1 md:col-span-4 lg:col-span-3 bg-[#f9f9f9] p-4 border-r border-[#c4c7c7] flex flex-col gap-4 overflow-y-auto z-10 relative">
         <h2 class="text-lg font-bold text-[#1a1c1c]">Panel de Control ITS</h2>
         
+        <!-- Force Majeure Active Exemptions Banner (Classic Signal) -->
+        <div id="force-majeure-banner" class="flex items-center justify-between p-2.5 bg-[#a0f4ca] text-[#0b6c4b] border border-[#0b6c4b] rounded" style="border: 1px solid #0b6c4b; background-color: #a0f4ca; color: #0b6c4b; box-shadow: 2px 2px 0px rgba(10,10,10,0.1);">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#0b6c4b] animate-pulse inline-block"></span>
+            <span class="text-[11px] font-bold uppercase">Fuerza Mayor (3 unid / 500m / 15m)</span>
+          </div>
+          <span class="text-[10px] font-mono font-bold bg-[#0b6c4b] text-white px-1.5 py-0.5 rounded">EXENCIÓN AUTO</span>
+        </div>
+
         <!-- Metrics SaaS -->
         <div class="grid grid-cols-2 gap-2">
           <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
@@ -413,7 +425,7 @@
           </div>
         </div>
 
-        <button class="bg-[#eeeeee] border border-[#c4c7c7] rounded-md py-2 w-full text-xs font-bold active:bg-[#0a0a0a] active:text-white transition-colors" onclick="exportData()">⬇ Exportar Resumen CSV</button>
+        <button id="btn-export-financial-csv" class="bg-[#eeeeee] border border-[#c4c7c7] rounded-md py-2 w-full text-xs font-bold active:bg-[#0a0a0a] active:text-white transition-colors" onclick="exportData()">⬇ Exportar Resumen CSV</button>
 
         <hr class="border-[#c4c7c7] my-1">
         
@@ -551,6 +563,64 @@
           <button type="button" id="btn-start-shift" onclick="submitShiftStart()" class="btn btn-primary text-xs font-bold py-2 px-4 rounded text-white flex items-center gap-1.5" style="border: 1px solid #0b6c4b; background-color: #0b6c4b; color: #ffffff; padding: 8px 16px; font-size: 12px; border-radius: 4px; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             <span class="w-2 h-2 rounded-full bg-[#a0f4ca]" style="width: 8px; height: 8px; border-radius: 9999px; background-color: #a0f4ca; display: inline-block;"></span>
             Iniciar Turno y Activar GPS
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Modal: Apelación de Multas y Registro de Evidencia Fotográfica -->
+    <div id="modal-dispute-fine" class="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-[#0a0a0a]/60" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(10, 10, 10, 0.6); z-index: 3000; align-items: center; justify-content: center; padding: 16px;">
+      <div class="bg-white border border-[#c4c7c7] rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 flex flex-col gap-4 text-[#1a1c1c]" style="background-color: #ffffff; border: 1px solid #c4c7c7; border-radius: 8px; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 20px;">
+        
+        <!-- Modal Header -->
+        <div class="flex justify-between items-start border-b border-[#c4c7c7] pb-3" style="border-bottom: 1px solid #c4c7c7; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="flex flex-col">
+            <div class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ffba38] inline-block" style="width: 10px; height: 10px; border-radius: 9999px; background-color: #ffba38;"></span>
+              <h2 class="text-base font-bold uppercase text-[#0a0a0a] tracking-wide" style="margin: 0; font-size: 15px; font-weight: 700; color: #0a0a0a;">Apelación de Multa / Sanción</h2>
+            </div>
+            <span class="text-xs text-[#444748]" style="font-size: 12px; color: #444748;">Disputa con Evidencia GPS y Fotográfica en Ruta</span>
+          </div>
+          <button type="button" onclick="closeDisputeModal()" class="text-[#444748] hover:text-[#0a0a0a] text-lg font-bold px-2 py-0.5 rounded border border-[#c4c7c7] bg-[#eeeeee]" style="border: 1px solid #c4c7c7; background: #eeeeee; cursor: pointer; border-radius: 4px; padding: 2px 8px; font-size: 16px;">&times;</button>
+        </div>
+
+        <!-- Datos de la Sanción -->
+        <div class="grid grid-cols-2 gap-3" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+            <label for="dispute-fine-id" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Folio Sanción</label>
+            <input type="text" id="dispute-fine-id" value="U14-DEMO-001" readonly class="border border-[#c4c7c7] rounded px-2.5 py-1.5 text-xs font-mono font-bold bg-[#eeeeee] text-[#1a1c1c] focus:outline-none" style="border: 1px solid #c4c7c7; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #eeeeee;" />
+          </div>
+          <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+            <label for="dispute-fine-amount" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Monto Disputado</label>
+            <input type="text" id="dispute-fine-amount" value="$50.00 MXN" readonly class="border border-[#ba1a1a] rounded px-2.5 py-1.5 text-xs font-mono font-bold bg-[#ffdad6] text-[#93000a] focus:outline-none" style="border: 1px solid #ba1a1a; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #ffdad6; color: #93000a;" />
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+          <label for="dispute-reason" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Motivo de la Disputa / Fuerza Mayor</label>
+          <textarea id="dispute-reason" rows="3" class="border border-[#c4c7c7] rounded px-2.5 py-1.5 text-xs font-medium bg-[#f9f9f9] text-[#1a1c1c] focus:outline-none focus:border-[#0b6c4b]" style="border: 1px solid #c4c7c7; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #f9f9f9; resize: vertical;">Bloqueo vial y manifestación en el tramo. 3 unidades detenidas.</textarea>
+        </div>
+
+        <!-- Evidencia Fotográfica (FileProvider) -->
+        <div class="border border-[#c4c7c7] rounded p-3 bg-[#f9f9f9] flex flex-col gap-2.5" style="border: 1px solid #c4c7c7; border-radius: 6px; padding: 12px; background-color: #f9f9f9; display: flex; flex-direction: column; gap: 10px;">
+          <span class="text-xs font-bold uppercase text-[#0a0a0a]" style="font-size: 12px; font-weight: 700; color: #0a0a0a;">Evidencia Fotográfica de Apoyo</span>
+          <div class="flex items-center gap-3" style="display: flex; align-items: center; gap: 12px;">
+            <button type="button" id="btn-capture-photo" onclick="captureDisputePhoto()" class="btn text-xs font-bold py-2 px-3 bg-[#0a0a0a] text-white border border-[#0a0a0a] rounded flex items-center gap-1.5 hover:bg-[#212121]" style="border: 1px solid #0a0a0a; background-color: #0a0a0a; color: #ffffff; padding: 8px 12px; font-size: 12px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              📷 Adjuntar Foto Evidencia
+            </button>
+            <span id="photo-evidence-status" class="text-xs font-mono text-[#444748]" style="font-size: 11px; color: #444748;">Sin foto adjunta</span>
+          </div>
+          <span class="text-[10px] text-[#444748]" style="font-size: 10px; color: #444748;">Se almacena como URI privada bajo FileProvider seguro (dispute_photos/)</span>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex justify-end items-center gap-2 pt-2 border-t border-[#c4c7c7]" style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid #c4c7c7;">
+          <button type="button" onclick="closeDisputeModal()" class="btn btn-secondary text-xs font-semibold py-2 px-3 rounded" style="border: 1px solid #0a0a0a; background: transparent; color: #0a0a0a; padding: 8px 12px; font-size: 12px; border-radius: 4px; cursor: pointer;">
+            Cancelar
+          </button>
+          <button type="button" id="btn-submit-dispute" onclick="submitDisputeFine()" class="btn btn-primary text-xs font-bold py-2 px-4 rounded text-[#0a0a0a] bg-[#ffba38] border border-[#b57e00] flex items-center gap-1.5" style="border: 1px solid #b57e00; background-color: #ffba38; color: #0a0a0a; padding: 8px 16px; font-size: 12px; border-radius: 4px; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            Enviar Disputa al Despacho
           </button>
         </div>
 
@@ -827,15 +897,58 @@
       alert(`Reporte enviado: ${type}. El despachador será notificado.`);
     }
 
+    function openDisputeModal() {
+      const modal = document.getElementById('modal-dispute-fine');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeDisputeModal() {
+      const modal = document.getElementById('modal-dispute-fine');
+      if (modal) modal.style.display = 'none';
+    }
+
     function disputeFine() {
-      // ID de multa de demostración hasta que la Fase 4 cargue las sanciones reales del turno.
-      const fineId = 'U14-DEMO-001';
-      const reason = 'Apelación con telemetría GPS y reporte de bloqueo en el tramo.';
-      if (window.CronoBusNative && typeof window.CronoBusNative.disputeFine === 'function') {
-        window.CronoBusNative.disputeFine(fineId, reason);
+      openDisputeModal();
+    }
+
+    function captureDisputePhoto() {
+      const statusSpan = document.getElementById('photo-evidence-status');
+      if (window.CronoBusNative && typeof window.CronoBusNative.captureDisputePhoto === 'function') {
+        window.CronoBusNative.captureDisputePhoto();
         return;
       }
-      alert('Abriendo disputa con evidencia GPS...');
+      if (statusSpan) {
+        statusSpan.innerText = '📷 Foto adjunta: IMG_EVID_20261031.jpg';
+        statusSpan.style.color = '#0b6c4b';
+      }
+    }
+
+    function submitDisputeFine() {
+      const fineId = document.getElementById('dispute-fine-id')?.value || 'U14-DEMO-001';
+      const reason = document.getElementById('dispute-reason')?.value || 'Apelación con telemetría GPS y reporte de bloqueo en el tramo.';
+      if (window.CronoBusNative && typeof window.CronoBusNative.disputeFine === 'function') {
+        window.CronoBusNative.disputeFine(fineId, reason);
+        closeDisputeModal();
+        return;
+      }
+      alert(`Apelación registrada para sanción ${fineId}:\n"${reason}"\nEvidencia fotográfica vinculada.`);
+      closeDisputeModal();
+    }
+
+    function initDarkMode() {
+      const darkModeBtn = document.getElementById('btn-dark-mode-toggle');
+      const isDarkSaved = localStorage.getItem('cronobus_dark_mode') === 'true';
+      if (isDarkSaved) {
+        document.body.classList.add('dark-mode');
+        if (darkModeBtn) darkModeBtn.innerText = '☀️ Modo Día';
+      }
+      if (darkModeBtn) {
+        darkModeBtn.addEventListener('click', () => {
+          const isDark = document.body.classList.toggle('dark-mode');
+          localStorage.setItem('cronobus_dark_mode', isDark ? 'true' : 'false');
+          darkModeBtn.innerText = isDark ? '☀️ Modo Día' : '🌙 Modo Noche';
+        });
+      }
     }
 
     function exportData() {
@@ -983,6 +1096,7 @@
       firstBtn.classList.remove('border-transparent', 'text-[#444748]');
 
       initMaps();
+      initDarkMode();
       console.log("CronoBus logic initialized.");
       requestAnimationFrame(tick);
     }

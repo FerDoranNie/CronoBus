@@ -299,3 +299,167 @@ html, body {
 .overflow-y-auto { overflow-y: auto; }
 .overflow-hidden { overflow: hidden; }
 
+
+/* ==========================================================================
+   CronoBus Dark Mode (High-Contrast Utilitarian / Classic Signal Dark)
+   Apego estricto a Designs/Design_dark.md y AGENTS.md:
+   - Superficie: #0a0a0a / #141414
+   - Tarjetas / Contenedores: #1e1e1e / #201f1f
+   - Texto principal: #f5f5f5 / #e5e2e1
+   - Texto secundario: #c4c7c7
+   - Bordes sólidos: 1px solid #333333
+   - Acento: #ffba38 / #ff6d00
+   - Verde ITS: #a0f4ca / #3ce36a
+   - Cero sombras difusas (solo 4px 4px 0px rgba(0,0,0,0.4) o bordes de 1px)
+   ========================================================================== */
+
+body.dark-mode {
+  --color-surface: #141414;
+  --color-surface-card: #1e1e1e;
+  --color-surface-mid: #252525;
+  --color-border: #333333;
+  --color-text-main: #f5f5f5;
+  --color-text-muted: #c4c7c7;
+  --shadow-hard: 4px 4px 0px rgba(0, 0, 0, 0.4);
+  --shadow-hard-sm: 2px 2px 0px rgba(0, 0, 0, 0.4);
+  background-color: #141414 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode .bg-surface,
+body.dark-mode .bg-\[\#f9f9f9\],
+body.dark-mode .bg-slate-50,
+body.dark-mode .bg-green-50\/50 {
+  background-color: #141414 !important;
+}
+
+body.dark-mode .bg-white,
+body.dark-mode .info-card,
+body.dark-mode .bg-\[\#eeeeee\] {
+  background-color: #1e1e1e !important;
+}
+
+body.dark-mode nav#nav-tabs {
+  background-color: #141414 !important;
+  border-bottom-color: #333333 !important;
+}
+
+body.dark-mode nav#nav-tabs button {
+  color: #c4c7c7 !important;
+}
+
+body.dark-mode nav#nav-tabs button.border-\[\#0b6c4b\] {
+  color: #a0f4ca !important;
+  border-bottom-color: #a0f4ca !important;
+}
+
+body.dark-mode footer {
+  background-color: #1a1a1a !important;
+  border-top-color: #333333 !important;
+}
+
+body.dark-mode footer button,
+body.dark-mode footer select {
+  background-color: #262626 !important;
+  color: #f5f5f5 !important;
+  border-color: #333333 !important;
+}
+
+body.dark-mode .border,
+body.dark-mode .border-b,
+body.dark-mode .border-t,
+body.dark-mode .border-r,
+body.dark-mode .border-l,
+body.dark-mode .border-\[\#c4c7c7\],
+body.dark-mode .border-\[\#eeeeee\] {
+  border-color: #333333 !important;
+}
+
+body.dark-mode .text-\[\#1a1c1c\],
+body.dark-mode .text-\[\#0a0a0a\],
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3 {
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode .text-\[\#444748\] {
+  color: #c4c7c7 !important;
+}
+
+body.dark-mode .action-btn {
+  background-color: #252525 !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #262626 !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode .shadow-hard,
+body.dark-mode [style*="box-shadow: 4px 4px 0px"] {
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode .shadow-hard-sm,
+body.dark-mode [style*="box-shadow: 2px 2px 0px"] {
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode #modal-shift-start > div,
+body.dark-mode #modal-dispute-fine > div {
+  background-color: #1e1e1e !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode #modal-shift-start .bg-\[\#f9f9f9\],
+body.dark-mode #modal-shift-start .bg-white,
+body.dark-mode #modal-dispute-fine .bg-\[\#f9f9f9\],
+body.dark-mode #modal-dispute-fine .bg-white {
+  background-color: #252525 !important;
+  border-color: #333333 !important;
+}
+
+body.dark-mode #modal-shift-start input[type="text"],
+body.dark-mode #modal-dispute-fine input[type="text"],
+body.dark-mode #modal-dispute-fine textarea {
+  background-color: #1a1a1a !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode #modal-shift-start button[onclick*="close"],
+body.dark-mode #modal-dispute-fine button[onclick*="close"] {
+  background-color: #2a2a2a !important;
+  border-color: #333333 !important;
+  color: #f5f5f5 !important;
+}
+
+body.dark-mode .status-card-green {
+  background-color: #0b3d2b !important;
+  border-color: #0b6c4b !important;
+}
+
+body.dark-mode .status-card-green span {
+  color: #a0f4ca !important;
+}
+
+body.dark-mode .status-card-amber {
+  background-color: #332200 !important;
+  border-color: #ffba38 !important;
+}
+
+body.dark-mode .status-card-amber span {
+  color: #ffba38 !important;
+}
+
+body.dark-mode #view-admin .col-span-1 {
+  background-color: #141414 !important;
+  border-color: #333333 !important;
+}
