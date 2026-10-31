@@ -246,9 +246,9 @@
     </div>
     <div class='flex items-center gap-3'>
       <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
-      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
-        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
-        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      <div data-sync-queue-badge class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span data-sync-queue-dot class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span data-sync-queue-text>SYNC: 0 PEND</span>
       </div>
       <div class='flex flex-col items-end'>
         <span class='text-[10px] uppercase opacity-60'>Despacho</span>
@@ -378,12 +378,12 @@
             <span class='text-[9px] uppercase opacity-60'>Multas Pendientes</span>
             <div class='flex items-center gap-3'>
       <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
-      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
-        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
-        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      <div data-sync-queue-badge class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span data-sync-queue-dot class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span data-sync-queue-text>SYNC: 0 PEND</span>
       </div>
               <span class='text-lg font-mono font-bold text-[#ffdad6]'>0 Sanciones</span>
-              <button onclick="alert('Abriendo disputa con evidencia GPS...')" class='text-[9px] font-bold bg-[#ffba38] text-[#2f1e00] px-2 py-1 rounded-sm active:opacity-80'>APELAR</button>
+              <button onclick="disputeFine()" class='text-[9px] font-bold bg-[#ffba38] text-[#2f1e00] px-2 py-1 rounded-sm active:opacity-80'>APELAR</button>
             </div>
           </div>
         </div>
@@ -568,9 +568,9 @@
   <footer class='bg-[#eeeeee] border-t border-[#c4c7c7] p-2 flex flex-wrap items-center justify-between gap-3 shrink-0 relative w-full z-[2000] min-h-[56px]'>
     <div class='flex items-center gap-3'>
       <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
-      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
-        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
-        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      <div data-sync-queue-badge class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span data-sync-queue-dot class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span data-sync-queue-text>SYNC: 0 PEND</span>
       </div>
       <div class='bg-[#0a0a0a] px-3 py-1.5 rounded flex items-center gap-2'>
          <div class='w-2 h-2 bg-[#ffba38] rounded-full animate-pulse'></div>
@@ -820,11 +820,32 @@
 
     function setOccupancy(level) {
       units.find(u => u.id === 14).occupancy = level;
+      // Persistencia nativa: el nivel agregado se adjunta al siguiente cruce de geocerca (Room).
+      if (window.CronoBusNative && typeof window.CronoBusNative.reportOccupancy === 'function') {
+        window.CronoBusNative.reportOccupancy(level);
+        return;
+      }
       alert(`Aforo reportado: ${level}`);
     }
 
     function reportIncidence(type) {
+      // Guardado real en Room vía puente @JavascriptInterface (Store & Forward).
+      if (window.CronoBusNative && typeof window.CronoBusNative.reportIncidence === 'function') {
+        window.CronoBusNative.reportIncidence(type);
+        return;
+      }
       alert(`Reporte enviado: ${type}. El despachador será notificado.`);
+    }
+
+    function disputeFine() {
+      // ID de multa de demostración hasta que la Fase 4 cargue las sanciones reales del turno.
+      const fineId = 'U14-DEMO-001';
+      const reason = 'Apelación con telemetría GPS y reporte de bloqueo en el tramo.';
+      if (window.CronoBusNative && typeof window.CronoBusNative.disputeFine === 'function') {
+        window.CronoBusNative.disputeFine(fineId, reason);
+        return;
+      }
+      alert('Abriendo disputa con evidencia GPS...');
     }
 
     function exportData() {
@@ -872,17 +893,93 @@
     }
 
     function updateSyncQueueBadge(pendingCount) {
-      const badge = document.getElementById('sync-queue-badge');
-      const text = document.getElementById('sync-queue-text');
-      const dot = document.getElementById('sync-queue-dot');
-      if (!badge || !text) return;
-      text.innerText = `SYNC: ${pendingCount} PEND`;
-      if (pendingCount > 0) {
-        if (dot) dot.className = 'w-2 h-2 rounded-full bg-[#ffba38] inline-block';
-        badge.style.borderColor = '#ffba38';
+      const count = Math.max(0, parseInt(pendingCount, 10) || 0);
+      document.querySelectorAll('[data-sync-queue-text]').forEach(el => {
+        el.innerText = `SYNC: ${count} PEND`;
+      });
+      document.querySelectorAll('[data-sync-queue-dot]').forEach(dot => {
+        dot.className = count > 0
+          ? 'w-2 h-2 rounded-full bg-[#ffba38] inline-block'
+          : 'w-2 h-2 rounded-full bg-[#0b6c4b] inline-block';
+      });
+      document.querySelectorAll('[data-sync-queue-badge]').forEach(badge => {
+        badge.style.borderColor = count > 0 ? '#ffba38' : '#c4c7c7';
+      });
+    }
+
+    // ============================================================
+    // NATIVE BRIDGE (Kotlin -> WebView) — Semana 2, Paso 2
+    // Kotlin invoca estas funciones con evaluateJavascript en el hilo principal.
+    // ============================================================
+    window.CronoBus = {
+      onSyncQueue(payload) {
+        if (!payload) return;
+        updateSyncQueueBadge(payload.count);
+        updateNativeConnectivity(payload.online === true);
+      },
+      onTelemetry(payload) {
+        if (!payload) return;
+        // Último fix filtrado por Kalman; disponible para headway y ETA en la Fase 4.
+        window.__cronobusLastFix = payload;
+        window.__cronobusOccupancy = payload.occupancy;
+      },
+      onGeofence(payload) {
+        if (!payload) return;
+        window.__cronobusLastGeofence = payload;
+        console.log(`[CronoBus] Geocerca ${payload.transition}: ${payload.zoneName}`);
+      },
+      onTamper(payload) {
+        if (!payload) return;
+        console.warn(`[CronoBus] Anti-sabotaje ${payload.type}: ${payload.description}`);
+        if (!payload.blocking) return;
+
+        const badge = document.getElementById('driver-signal-badge');
+        if (badge) {
+          badge.className = 'bg-[#ffdad6] text-[#93000a] border border-[#ba1a1a] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase';
+          badge.innerHTML = 'GPS BLOQUEADO';
+        }
+
+        const container = document.getElementById('admin-alerts-container');
+        if (container) {
+          container.insertAdjacentHTML('afterbegin', `
+            <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#ba1a1a] rounded-md p-3" data-native-alert>
+              <div class="flex justify-between items-start mb-1">
+                <span class="text-xs font-bold text-[#ba1a1a]">ANTI-SABOTAJE</span>
+                <span class="text-[10px] text-[#444748] font-mono">Ahora</span>
+              </div>
+              <p class="text-xs mb-2 text-[#1a1c1c]"></p>
+            </div>
+          `);
+          const description = container.querySelector('[data-native-alert] p');
+          if (description) description.innerText = payload.description || payload.type;
+        }
+      },
+      onNativeEvent(payload) {
+        if (!payload) return;
+        console.log(`[CronoBus] ${payload.event}`, payload);
+        if (payload.event === 'error') {
+          alert(`CronoBus: ${payload.message}`);
+        } else if (payload.event === 'shiftStarted') {
+          window.__cronobusShiftId = payload.shiftId;
+        } else if (payload.event === 'incidenceReported') {
+          alert(`Incidencia guardada en el dispositivo (pendiente de sincronizar: ${payload.pendingSyncCount}).`);
+        } else if (payload.event === 'disputeFiled') {
+          alert(`Apelación guardada (pendiente de sincronizar: ${payload.pendingSyncCount}).`);
+        } else if (payload.event === 'occupancyUpdated') {
+          alert(`Aforo actualizado: ${payload.level}`);
+        }
+      }
+    };
+
+    function updateNativeConnectivity(online) {
+      const badge = document.getElementById('driver-signal-badge');
+      if (!badge) return;
+      if (online) {
+        badge.className = 'pill-green px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE';
       } else {
-        if (dot) dot.className = 'w-2 h-2 rounded-full bg-[#0b6c4b] inline-block';
-        badge.style.borderColor = '#c4c7c7';
+        badge.className = 'bg-[#2f1e00] text-[#ffba38] border border-[#ffba38] rounded-full px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase';
+        badge.innerHTML = 'STORE & FORWARD';
       }
     }
 

@@ -1,6 +1,7 @@
 package com.cronobus.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.cronobus.app.data.local.IncidenceType
 import com.cronobus.app.data.local.SyncStatus
@@ -10,7 +11,14 @@ import com.cronobus.app.data.local.SyncStatus
  *
  * Utilizado para notificar al despacho y alimentar el algoritmo de exención de multas por fuerza mayor.
  */
-@Entity(tableName = "incidence_reports")
+@Entity(
+    tableName = "incidence_reports",
+    indices = [
+        Index(value = ["syncStatus", "timestampUtcMs"]),
+        Index(value = ["routeId", "timestampUtcMs"]),
+        Index(value = ["incidenceType", "timestampUtcMs"]),
+    ],
+)
 data class IncidenceReportEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,

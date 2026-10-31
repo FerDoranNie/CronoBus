@@ -1,6 +1,7 @@
 package com.cronobus.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.cronobus.app.data.local.SyncStatus
 
@@ -12,7 +13,13 @@ import com.cronobus.app.data.local.SyncStatus
  * - Registra el checklist de mantenimiento preventivo (frenos, luces, aceite) para seguridad en el transporte.
  * - No almacena datos personales sensibles ni biométricos; únicamente el alias operativo (`driverAlias`).
  */
-@Entity(tableName = "shift_logs")
+@Entity(
+    tableName = "shift_logs",
+    indices = [
+        Index(value = ["syncStatus"]),
+        Index(value = ["endTimestampUtcMs", "startTimestampUtcMs"]),
+    ],
+)
 data class ShiftLogEntity(
     @PrimaryKey
     val shiftId: String,
@@ -30,5 +37,6 @@ data class ShiftLogEntity(
     val endElapsedRealtimeNanos: Long? = null,
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val retryCount: Int = 0,
+    val lastSyncAttemptMs: Long? = null,
 )
 

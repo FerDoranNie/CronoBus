@@ -1,6 +1,7 @@
 package com.cronobus.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.cronobus.app.data.local.SyncStatus
 
@@ -9,7 +10,14 @@ import com.cronobus.app.data.local.SyncStatus
  *
  * Incluye evidencia fotográfica opcional y copia de la telemetría local persistida para auditoría.
  */
-@Entity(tableName = "fine_disputes")
+@Entity(
+    tableName = "fine_disputes",
+    indices = [
+        Index(value = ["syncStatus", "timestampUtcMs"]),
+        Index(value = ["fineId"]),
+        Index(value = ["shiftId"]),
+    ],
+)
 data class FineDisputeEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,

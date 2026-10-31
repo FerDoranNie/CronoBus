@@ -1,6 +1,7 @@
 package com.cronobus.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.cronobus.app.data.local.OccupancyLevel
 import com.cronobus.app.data.local.SyncStatus
@@ -10,7 +11,14 @@ import com.cronobus.app.data.local.SyncStatus
  *
  * Persistido localmente en Room y encolado para sincronización Store & Forward.
  */
-@Entity(tableName = "checkpoint_events")
+@Entity(
+    tableName = "checkpoint_events",
+    indices = [
+        Index(value = ["syncStatus", "timestampUtcMs"]),
+        Index(value = ["shiftId"]),
+        Index(value = ["checkpointId"]),
+    ],
+)
 data class CheckpointEventEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
