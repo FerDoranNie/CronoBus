@@ -48,17 +48,20 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 
 ---
 
-## 💾 Fase 3: Persistencia Local (Store & Forward) y Sincronización
+## 💾 Fase 3: Persistencia Local (Store & Forward), Seguridad WebView y Puente JS (🔄 En Curso — Semana 2)
+- [ ] **1.4 Endurecimiento de Seguridad en WebView (Pendiente de Fase 1 → Semana 2):**
+  - Deshabilitar `allowFileAccess = true` y `allowContentAccess = true` innecesarios, restringir `MIXED_CONTENT_NEVER_ALLOW` (o interceptar `https://appassets.androidplatform.net/` en `WebViewClient.shouldInterceptRequest`) y asegurar carga offline de `classic_signal_offline.css`.
 - [ ] **3.1 Base de Datos Room (`CronoBusDatabase.kt`):**
-  - Entidad `CheckpointEventEntity` (cruce de geocerca, timestamp UTC, lat/lng filtrada, desvío vs. horario, estado de sincronización).
-  - Entidad `IncidenceReportEntity` (tipo: Tráfico/Bloqueo/Accidente/Falla, lat/lng, foto URI opcional, timestamp, estado sync).
-  - Entidad `FineDisputeEntity` (id multa, motivo, evidencia URI, telemetría adjunta, estado).
-  - Entidad `ShiftLogEntity` (inicio/fin de turno, checklist de mantenimiento preventivo, firma digital de consentimiento LFT/LGPDPPSO).
-- [ ] **3.2 Cola de Sincronización Resiliente (`SyncWorker` / `StoreAndForwardManager`):**
+  - Enum y TypeConverters (`SyncStatus`, `OccupancyLevel`, `IncidenceType`, `TamperSeverity`).
+  - Entidad `CheckpointEventEntity` (cruce de geocerca, timestamp UTC, `elapsedRealtimeNanos`, lat/lng filtrada, desvío vs. horario, `OccupancyLevel`, estado de sincronización).
+  - Entidad `IncidenceReportEntity` (tipo: Tráfico/Bloqueo/Accidente/Falla, lat/lng, tramo/ruta, foto URI opcional, timestamp UTC, `elapsedRealtimeNanos`, estado sync).
+  - Entidad `FineDisputeEntity` (id multa, motivo, evidencia URI, telemetría adjunta, timestamp UTC, estado sync).
+  - Entidad `ShiftLogEntity` (inicio/fin de turno, unidad/ruta, checklist de mantenimiento preventivo: frenos/luces/aceite, firma digital de consentimiento LFT/LGPDPPSO, estado sync).
+- [ ] **3.2 Cola de Sincronización Resiliente (`StoreAndForwardSyncManager.kt`):**
   - Monitorear conectividad real con `ConnectivityManager.NetworkCallback`.
-  - Al recuperar red, enviar lotes pendientes en orden cronológico con reintentos exponenciales (Exponential Backoff).
+  - Al recuperar red, enviar lotes pendientes (`PENDING` / `FAILED`) en orden cronológico (`elapsedRealtimeNanos` / `timestampUtcMs`) con reintentos exponenciales (Exponential Backoff) y límite de lote.
 - [ ] **3.3 Puente Bidireccional Nativo ↔ WebView (`CronoBusJsBridge.kt`) / Estado UI:**
-  - Exponer `@JavascriptInterface` seguro (o migrar vistas a Compose) para que la UI reciba telemetría GPS real, estado de cola offline (`Store & Forward`) y dispare guardado real en `Room`.
+  - Exponer `@JavascriptInterface` seguro (`window.CronoBusNative`) para que la UI en [`cronobus.html`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/assets/cronobus.html) reciba telemetría GPS filtrada real, alertas de geocerca/sabotaje, estado de cola offline (`Store & Forward`) y dispare guardado real en `Room` (inicio de turno con checklist LFT/LGPDPPSO, reporte de incidencia, apelación de multa y conteo agregado de ocupación `BAJA`/`MEDIA`/`LLENO`).
 
 ---
 

@@ -244,7 +244,12 @@
       <h1 class='text-xs font-bold uppercase tracking-wider text-[#ffba38]'>CronoBus System</h1>
       <span class='text-lg font-bold leading-tight'>B2B ITS Control</span>
     </div>
-    <div class='flex items-center gap-2'>
+    <div class='flex items-center gap-3'>
+      <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
+      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      </div>
       <div class='flex flex-col items-end'>
         <span class='text-[10px] uppercase opacity-60'>Despacho</span>
         <span class='font-mono font-bold text-sm'>Central</span>
@@ -273,8 +278,13 @@
             <span class="text-lg font-bold text-[#1a1c1c] leading-tight">Ruta 42 - Ramal Centro</span>
             <span class="text-xs font-medium text-[#444748]">Unidad #14 • Op: J. Pérez</span>
           </div>
-          <div id="driver-signal-badge" class="pill-green px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE
+          <div class="flex items-center gap-2">
+            <button id="btn-open-shift-modal" onclick="openShiftModal()" class="btn text-[10px] font-bold uppercase py-1 px-2.5 bg-[#ffba38] text-[#0a0a0a] border border-[#b57e00] rounded hover:bg-[#ffba38]/90" style="border: 1px solid #b57e00; box-shadow: 2px 2px 0px rgba(10,10,10,0.1); background-color: #ffba38; color: #0a0a0a;">
+              Turno LFT
+            </button>
+            <div id="driver-signal-badge" class="pill-green px-2 py-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#0b6c4b] block animate-pulse"></span> ONLINE
+            </div>
           </div>
         </div>
 
@@ -366,7 +376,12 @@
           <div class='h-8 w-px bg-white/20'></div>
           <div class='flex flex-col items-end'>
             <span class='text-[9px] uppercase opacity-60'>Multas Pendientes</span>
-            <div class='flex items-center gap-2'>
+            <div class='flex items-center gap-3'>
+      <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
+      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      </div>
               <span class='text-lg font-mono font-bold text-[#ffdad6]'>0 Sanciones</span>
               <button onclick="alert('Abriendo disputa con evidencia GPS...')" class='text-[9px] font-bold bg-[#ffba38] text-[#2f1e00] px-2 py-1 rounded-sm active:opacity-80'>APELAR</button>
             </div>
@@ -467,11 +482,96 @@
       </div>
     </div>
 
+
+    <!-- Modal: Inicio de Turno y Consentimiento LFT / LGPDPPSO -->
+    <div id="modal-shift-start" class="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-[#0a0a0a]/60" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(10, 10, 10, 0.6); z-index: 3000; align-items: center; justify-content: center; padding: 16px;">
+      <div class="bg-white border border-[#c4c7c7] rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 flex flex-col gap-4 text-[#1a1c1c]" style="background-color: #ffffff; border: 1px solid #c4c7c7; border-radius: 8px; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 20px;">
+        
+        <!-- Modal Header -->
+        <div class="flex justify-between items-start border-b border-[#c4c7c7] pb-3" style="border-bottom: 1px solid #c4c7c7; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="flex flex-col">
+            <div class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#0b6c4b] inline-block" style="width: 10px; height: 10px; border-radius: 9999px; background-color: #0b6c4b;"></span>
+              <h2 class="text-base font-bold uppercase text-[#0a0a0a] tracking-wide" style="margin: 0; font-size: 15px; font-weight: 700; color: #0a0a0a;">Inicio de Turno y Despacho</h2>
+            </div>
+            <span class="text-xs text-[#444748]" style="font-size: 12px; color: #444748;">Marco Normativo LFT y LGPDPPSO (Operación de Transporte)</span>
+          </div>
+          <button type="button" onclick="closeShiftModal()" class="text-[#444748] hover:text-[#0a0a0a] text-lg font-bold px-2 py-0.5 rounded border border-[#c4c7c7] bg-[#eeeeee]" style="border: 1px solid #c4c7c7; background: #eeeeee; cursor: pointer; border-radius: 4px; padding: 2px 8px; font-size: 16px;">&times;</button>
+        </div>
+
+        <!-- Datos Operativos -->
+        <div class="grid grid-cols-2 gap-3" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+            <label for="shift-driver-alias" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Alias / Conductor</label>
+            <input type="text" id="shift-driver-alias" value="Op. J. Pérez" class="border border-[#c4c7c7] rounded px-2.5 py-1.5 text-xs font-medium bg-[#f9f9f9] text-[#1a1c1c] focus:outline-none focus:border-[#0b6c4b]" style="border: 1px solid #c4c7c7; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #f9f9f9;" />
+          </div>
+          <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+            <label for="shift-unit-id" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Unidad Asignada</label>
+            <input type="text" id="shift-unit-id" value="14" class="border border-[#c4c7c7] rounded px-2.5 py-1.5 text-xs font-mono font-bold bg-[#f9f9f9] text-[#1a1c1c] focus:outline-none focus:border-[#0b6c4b]" style="border: 1px solid #c4c7c7; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #f9f9f9;" />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1" style="display: flex; flex-direction: column; gap: 4px;">
+          <label for="shift-route-id" class="text-[11px] font-bold uppercase text-[#444748]" style="font-size: 11px; font-weight: 700; color: #444748;">Ruta / Ramal</label>
+          <input type="text" id="shift-route-id" value="Ruta 42 - Ramal Centro" class="border border-[#c4c7c7] rounded px-2.5 py-1.5 text-xs font-medium bg-[#f9f9f9] text-[#1a1c1c] focus:outline-none focus:border-[#0b6c4b]" style="border: 1px solid #c4c7c7; border-radius: 4px; padding: 6px 10px; font-size: 12px; background: #f9f9f9;" />
+        </div>
+
+        <!-- Checklist de Mantenimiento Preventivo -->
+        <div class="border border-[#c4c7c7] rounded p-3 bg-[#f9f9f9] flex flex-col gap-2" style="border: 1px solid #c4c7c7; border-radius: 6px; padding: 12px; background-color: #f9f9f9; display: flex; flex-direction: column; gap: 8px;">
+          <span class="text-xs font-bold uppercase text-[#0a0a0a] flex items-center gap-1.5" style="font-size: 12px; font-weight: 700; color: #0a0a0a; display: flex; align-items: center; gap: 6px;">
+            Checklist Preventivo de Seguridad Vial
+          </span>
+          <label class="flex items-center gap-2 text-xs font-medium text-[#1a1c1c] cursor-pointer" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="shift-chk-brakes" checked class="w-4 h-4 accent-[#0b6c4b] rounded" style="accent-color: #0b6c4b; width: 16px; height: 16px;" />
+            <span>Frenos y balatas en condiciones óptimas</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs font-medium text-[#1a1c1c] cursor-pointer" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="shift-chk-lights" checked class="w-4 h-4 accent-[#0b6c4b] rounded" style="accent-color: #0b6c4b; width: 16px; height: 16px;" />
+            <span>Luces frontales, traseras e intermitentes funcionales</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs font-medium text-[#1a1c1c] cursor-pointer" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="shift-chk-oil" checked class="w-4 h-4 accent-[#0b6c4b] rounded" style="accent-color: #0b6c4b; width: 16px; height: 16px;" />
+            <span>Nivel de aceite de motor y refrigerante verificado</span>
+          </label>
+        </div>
+
+        <!-- Declaración y Consentimiento Legal LFT / LGPDPPSO -->
+        <div class="border border-[#c4c7c7] rounded p-3 bg-white flex flex-col gap-2.5" style="border: 1px solid #c4c7c7; border-radius: 6px; padding: 12px; background-color: #ffffff; display: flex; flex-direction: column; gap: 10px;">
+          <span class="text-xs font-bold uppercase text-[#0a0a0a]" style="font-size: 12px; font-weight: 700; color: #0a0a0a;">Aviso de Privacidad y Geolocalización Laboral</span>
+          <p class="text-[11px] leading-relaxed text-[#444748]" style="font-size: 11px; line-height: 1.45; color: #444748; margin: 0;">
+            En apego a la <strong>Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados (LGPDPPSO)</strong> y el marco de la <strong>Ley Federal del Trabajo (LFT)</strong>, se hace constar que el servicio de geolocalización GPS opera de manera estricta y exclusiva durante el turno activo para el monitoreo de frecuencias de despacho (headway), seguridad de pasajeros y auditoría operativa. No se recolectan datos biométricos, hábitos personales ni telemetría fuera del horario laboral.
+          </p>
+          <label class="flex items-start gap-2 pt-2 border-t border-[#c4c7c7] cursor-pointer" style="display: flex; align-items: flex-start; gap: 8px; padding-top: 8px; border-top: 1px solid #c4c7c7; cursor: pointer;">
+            <input type="checkbox" id="shift-chk-consent" class="w-4 h-4 mt-0.5 accent-[#0b6c4b] rounded" style="accent-color: #0b6c4b; width: 16px; height: 16px; margin-top: 2px;" />
+            <span class="text-xs font-semibold text-[#0a0a0a]" style="font-size: 12px; font-weight: 600; color: #0a0a0a;">
+              He leído y acepto el consentimiento de geolocalización laboral para este turno y certifico la revisión técnica de la unidad.
+            </span>
+          </label>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex justify-end items-center gap-2 pt-2 border-t border-[#c4c7c7]" style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid #c4c7c7;">
+          <button type="button" onclick="closeShiftModal()" class="btn btn-secondary text-xs font-semibold py-2 px-3 rounded" style="border: 1px solid #0a0a0a; background: transparent; color: #0a0a0a; padding: 8px 12px; font-size: 12px; border-radius: 4px; cursor: pointer;">
+            Cancelar
+          </button>
+          <button type="button" id="btn-start-shift" onclick="submitShiftStart()" class="btn btn-primary text-xs font-bold py-2 px-4 rounded text-white flex items-center gap-1.5" style="border: 1px solid #0b6c4b; background-color: #0b6c4b; color: #ffffff; padding: 8px 16px; font-size: 12px; border-radius: 4px; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <span class="w-2 h-2 rounded-full bg-[#a0f4ca]" style="width: 8px; height: 8px; border-radius: 9999px; background-color: #a0f4ca; display: inline-block;"></span>
+            Iniciar Turno y Activar GPS
+          </button>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 
   <!-- ================= SIMULATION CONTROLS (BOTTOM BAR) ================= -->
   <footer class='bg-[#eeeeee] border-t border-[#c4c7c7] p-2 flex flex-wrap items-center justify-between gap-3 shrink-0 relative w-full z-[2000] min-h-[56px]'>
-    <div class='flex items-center gap-2'>
+    <div class='flex items-center gap-3'>
+      <!-- Store & Forward Queue Indicator Badge (Classic Signal) -->
+      <div id="sync-queue-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#0a0a0a] border border-[#c4c7c7] rounded font-mono text-[11px] font-bold" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff; color: #0a0a0a;">
+        <span id="sync-queue-dot" class="w-2 h-2 rounded-full bg-[#0b6c4b] inline-block"></span>
+        <span id="sync-queue-text">SYNC: 0 PEND</span>
+      </div>
       <div class='bg-[#0a0a0a] px-3 py-1.5 rounded flex items-center gap-2'>
          <div class='w-2 h-2 bg-[#ffba38] rounded-full animate-pulse'></div>
          <span class='text-white text-[10px] font-bold uppercase'>SIM RUNNING</span>
@@ -729,6 +829,61 @@
 
     function exportData() {
       alert("Generando CSV...\nUnidades: 8\nRecaudación SaaS: $1,200\nMultas Inyectadas: $50\nBonos Pagados: $120");
+    }
+
+
+    // Store & Forward and Shift Modal Handlers (Paso 1: Gemini Flash / Paso 2: DeepSeek Bridge)
+    function openShiftModal() {
+      const modal = document.getElementById('modal-shift-start');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeShiftModal() {
+      const modal = document.getElementById('modal-shift-start');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    function submitShiftStart() {
+      const consent = document.getElementById('shift-chk-consent');
+      if (!consent || !consent.checked) {
+        alert("Atención: Debe aceptar el consentimiento de geolocalización laboral (LFT / LGPDPPSO) para iniciar el turno.");
+        return;
+      }
+      const brakesOk = document.getElementById('shift-chk-brakes')?.checked ?? false;
+      const lightsOk = document.getElementById('shift-chk-lights')?.checked ?? false;
+      const oilOk = document.getElementById('shift-chk-oil')?.checked ?? false;
+      const driverAlias = document.getElementById('shift-driver-alias')?.value || "Op. J. Pérez";
+      const unitId = document.getElementById('shift-unit-id')?.value || "14";
+      const routeId = document.getElementById('shift-route-id')?.value || "Ruta 42";
+
+      // Conexión reactiva con el puente nativo Android Room (DeepSeek - Paso 2)
+      if (window.CronoBusNative && typeof window.CronoBusNative.startShift === 'function') {
+        window.CronoBusNative.startShift(driverAlias, unitId, routeId, brakesOk, lightsOk, oilOk, true);
+      } else {
+        console.log("CronoBusNative no conectado aún. Turno iniciado localmente:", {
+          driverAlias, unitId, routeId, brakesOk, lightsOk, oilOk
+        });
+      }
+      closeShiftModal();
+    }
+
+    function updateSyncQueueBadge(pendingCount) {
+      const badge = document.getElementById('sync-queue-badge');
+      const text = document.getElementById('sync-queue-text');
+      const dot = document.getElementById('sync-queue-dot');
+      if (!badge || !text) return;
+      text.innerText = `SYNC: ${pendingCount} PEND`;
+      if (pendingCount > 0) {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-[#ffba38] inline-block';
+        badge.style.borderColor = '#ffba38';
+      } else {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-[#0b6c4b] inline-block';
+        badge.style.borderColor = '#c4c7c7';
+      }
     }
 
     // Init
