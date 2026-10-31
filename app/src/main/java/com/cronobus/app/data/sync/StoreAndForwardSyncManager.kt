@@ -18,16 +18,17 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -76,6 +77,9 @@ class StoreAndForwardSyncManager internal constructor(
         if (monitorConnectivity) appContext.getSystemService(ConnectivityManager::class.java) else null
 
     private val drainRequests = Channel<Unit>(Channel.CONFLATED)
+
+    /** Señal exclusiva de "la red volvió": interrumpe el backoff en curso. */
+    private val reconnectSignals = Channel<Unit>(Channel.CONFLATED)
     private val drainMutex = Mutex()
 
     private var workerJob: Job? = null
@@ -117,12 +121,14 @@ class StoreAndForwardSyncManager internal constructor(
     }.stateIn(scope, SharingStarted.Eagerly, 0)
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            updateConnectivity(online = true)
-        }
+        // Auditoría Paso 3: `onAvailable` llega ANTES de la validación (portal cautivo, red sin
+        // Internet). Marcar online aquí provocaba envíos fallidos que consumían `retryCount`.
+        // La transición a online la decide exclusivamente `onCapabilitiesChanged` (VALIDATED).
 
         override fun onLost(network: Network) {
-            updateConnectivity(online = isOnlineNow())
+            // Con `registerDefaultNetworkCallback`, `onLost` significa que ya no hay red por
+            // defecto; consultar `activeNetwork` aquí puede devolver todavía la red perdida.
+            updateConnectivity(online = false)
         }
 
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
@@ -170,7 +176,12 @@ class StoreAndForwardSyncManager internal constructor(
             if (retryableFailure && _isOnline.value) {
                 retryAttempt = (retryAttempt + 1).coerceAtMost(MAX_BACKOFF_EXPONENT)
                 // El primer reintento espera `baseBackoffMs`; después 2x, 4x, 8x…
-                delay(backoffMillis(retryAttempt - 1))
+                // Auditoría Paso 3: la espera se corta si la red se recupera (offline → online),
+                // para no dejar la cola dormida hasta 5 min tras volver la cobertura.
+                val reconnected = withTimeoutOrNull(backoffMillis(retryAttempt - 1)) {
+                    reconnectSignals.receive()
+                } != null
+                if (reconnected) retryAttempt = 0
                 drainRequests.trySend(Unit)
             } else {
                 retryAttempt = 0
@@ -389,10 +400,13 @@ class StoreAndForwardSyncManager internal constructor(
     }
 
     private fun updateConnectivity(online: Boolean) {
-        val wasOffline = !_isOnline.value
-        _isOnline.value = online
+        // Atómico: los callbacks de red llegan en un hilo binder distinto al del worker.
+        val wasOffline = !_isOnline.getAndUpdate { online }
         if (online) {
-            if (wasOffline) promoteFailedOnNextDrain.set(true)
+            if (wasOffline) {
+                promoteFailedOnNextDrain.set(true)
+                reconnectSignals.trySend(Unit)
+            }
             requestSync()
         }
     }

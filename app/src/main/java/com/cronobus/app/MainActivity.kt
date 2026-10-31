@@ -92,12 +92,17 @@ class MainActivity : ComponentActivity() {
             bridge.onLocationPermissionResult(granted = true)
             return
         }
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ),
-        )
+        val permissions = buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            // Auditoría Paso 3: en Android 13+ sin POST_NOTIFICATIONS la notificación persistente
+            // del rastreo queda oculta (el conductor no ve que el GPS laboral está activo, lo
+            // que contradice la transparencia exigida por LGPDPPSO). No bloquea el arranque.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        locationPermissionLauncher.launch(permissions.toTypedArray())
     }
 
     /**
@@ -234,8 +239,15 @@ fun WebViewScreen(
 }
 
 private fun isLocalOrigin(uri: Uri): Boolean {
+    // Auditoría Paso 3: antes se aceptaba cualquier `file://` y cualquier esquema hacia
+    // appassets. Con el puente expuesto, el allowlist debe ser exacto.
     val scheme = uri.scheme?.lowercase()
-    return scheme == "file" ||
-        scheme == "about" ||
-        uri.host == "appassets.androidplatform.net"
+    return when (scheme) {
+        "file" -> uri.path?.startsWith(ANDROID_ASSET_PATH) == true
+        "about" -> uri.toString() == "about:blank"
+        "https" -> uri.host == "appassets.androidplatform.net"
+        else -> false
+    }
 }
+
+private const val ANDROID_ASSET_PATH = "/android_asset/"

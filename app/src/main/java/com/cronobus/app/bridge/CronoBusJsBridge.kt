@@ -23,10 +23,10 @@ import com.cronobus.app.service.LocationTrackingService
 import java.lang.ref.WeakReference
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,9 +69,17 @@ class CronoBusJsBridge(
     private val incidenceDao = database.incidenceReportDao()
     private val disputeDao = database.fineDisputeDao()
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Auditoría Paso 3: las escrituras en Room viven en un scope de **proceso**, no de Activity.
+     * Antes `close()` cancelaba este scope en `onDestroy`, de modo que rotar la pantalla a mitad
+     * de un `startShift` / `reportIncidence` podía abortar la transacción y perder evidencia.
+     */
+    private val scope = processScope
     private val mainHandler = Handler(Looper.getMainLooper())
     private val shiftMutex = Mutex()
+
+    /** Evita turnos duplicados por doble toque en "Iniciar Turno" mientras el primero persiste. */
+    private val shiftStartInFlight = AtomicBoolean(false)
 
     @Volatile
     private var webViewRef: WeakReference<WebView>? = null
@@ -128,9 +136,9 @@ class CronoBusJsBridge(
     }
 
     fun close() {
+        // Solo se desconecta la UI; las escrituras en curso terminan en `processScope`.
         webViewRef = null
         onLocationPermissionRequired = null
-        scope.cancel()
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -168,52 +176,72 @@ class CronoBusJsBridge(
             return@jsGuard
         }
 
+        if (!shiftStartInFlight.compareAndSet(false, true)) {
+            pushError("startShift", "El turno ya se está registrando.")
+            return@jsGuard
+        }
+
         scope.launch {
-            shiftMutex.withLock {
-                try {
-                    val nowUtcMs = System.currentTimeMillis()
-                    val elapsedNanos = SystemClock.elapsedRealtimeNanos()
-                    val shift = ShiftLogEntity(
-                        shiftId = UUID.randomUUID().toString(),
-                        driverAlias = alias,
-                        unitId = unit,
-                        routeId = route,
-                        brakesOk = brakesOk,
-                        lightsOk = lightsOk,
-                        oilOk = oilOk,
-                        privacyAndLftConsentAccepted = true,
-                        consentTimestampUtcMs = nowUtcMs,
-                        startTimestampUtcMs = nowUtcMs,
-                        startElapsedRealtimeNanos = elapsedNanos,
-                    )
+            try {
+                startShiftLocked(alias, unit, route, brakesOk, lightsOk, oilOk)
+            } finally {
+                shiftStartInFlight.set(false)
+            }
+        }
+    }
 
-                    database.withTransaction {
-                        // Un turno nuevo cierra el anterior: nunca quedan dos turnos abiertos.
-                        shiftDao.getActiveShift()?.let { previous ->
-                            shiftDao.updateEndShift(previous.shiftId, nowUtcMs, elapsedNanos)
-                        }
-                        shiftDao.insert(shift)
+    private suspend fun startShiftLocked(
+        alias: String,
+        unit: String,
+        route: String,
+        brakesOk: Boolean,
+        lightsOk: Boolean,
+        oilOk: Boolean,
+    ) {
+        shiftMutex.withLock {
+            try {
+                val nowUtcMs = System.currentTimeMillis()
+                val elapsedNanos = SystemClock.elapsedRealtimeNanos()
+                val shift = ShiftLogEntity(
+                    shiftId = UUID.randomUUID().toString(),
+                    driverAlias = alias,
+                    unitId = unit,
+                    routeId = route,
+                    brakesOk = brakesOk,
+                    lightsOk = lightsOk,
+                    oilOk = oilOk,
+                    privacyAndLftConsentAccepted = true,
+                    consentTimestampUtcMs = nowUtcMs,
+                    startTimestampUtcMs = nowUtcMs,
+                    startElapsedRealtimeNanos = elapsedNanos,
+                )
+
+                database.withTransaction {
+                    // Un turno nuevo cierra el anterior: nunca quedan dos turnos abiertos.
+                    shiftDao.getActiveShift()?.let { previous ->
+                        shiftDao.updateEndShift(previous.shiftId, nowUtcMs, elapsedNanos)
                     }
-
-                    activeShift = shift
-                    occupancyLevel = OccupancyLevel.BAJA
-
-                    if (LocationTrackingService.hasLocationPermission(appContext)) {
-                        startTrackingAndReport(shift)
-                    } else {
-                        awaitingLocationPermission = true
-                        pushShiftStarted(shift, trackingActive = false, permissionRequired = true)
-                        val requestPermission = onLocationPermissionRequired
-                        if (requestPermission != null) {
-                            mainHandler.post(requestPermission)
-                        } else {
-                            Log.w(TAG, "Sin lanzador de permisos registrado por la Activity.")
-                        }
-                    }
-                } catch (failure: Throwable) {
-                    Log.e(TAG, "No fue posible registrar el turno.", failure)
-                    pushError("startShift", "No se pudo guardar el turno en la base local.")
+                    shiftDao.insert(shift)
                 }
+
+                activeShift = shift
+                occupancyLevel = OccupancyLevel.BAJA
+
+                if (LocationTrackingService.hasLocationPermission(appContext)) {
+                    startTrackingAndReport(shift)
+                } else {
+                    awaitingLocationPermission = true
+                    pushShiftStarted(shift, trackingActive = false, permissionRequired = true)
+                    val requestPermission = onLocationPermissionRequired
+                    if (requestPermission != null) {
+                        mainHandler.post(requestPermission)
+                    } else {
+                        Log.w(TAG, "Sin lanzador de permisos registrado por la Activity.")
+                    }
+                }
+            } catch (failure: Throwable) {
+                Log.e(TAG, "No fue posible registrar el turno.", failure)
+                pushError("startShift", "No se pudo guardar el turno en la base local.")
             }
         }
     }
@@ -221,21 +249,30 @@ class CronoBusJsBridge(
     /**
      * Invocado por la Activity cuando el conductor concede o niega los permisos de ubicación.
      * Debe llamarse en el hilo principal.
+     *
+     * Auditoría Paso 3: si la Activity se recreó mientras el diálogo estaba abierto (rotación),
+     * el resultado llega a un puente nuevo con `awaitingLocationPermission = false`. Antes se
+     * descartaba y el turno quedaba sin GPS; ahora se arranca el rastreo si hay turno abierto.
      */
     fun onLocationPermissionResult(granted: Boolean) {
-        if (!awaitingLocationPermission) return
+        val wasAwaiting = awaitingLocationPermission
         awaitingLocationPermission = false
 
         if (!granted) {
-            pushError(
-                "startShift",
-                "Ubicación denegada: el turno quedó registrado, pero el GPS no se activó.",
-            )
+            if (wasAwaiting) {
+                pushError(
+                    "startShift",
+                    "Ubicación denegada: el turno quedó registrado, pero el GPS no se activó.",
+                )
+            }
             return
         }
 
-        val shift = activeShift ?: return
-        startTrackingAndReport(shift)
+        if (LocationTrackingService.isRunning.value) return
+        scope.launch {
+            val shift = currentShiftOrLoad() ?: return@launch
+            mainHandler.post { startTrackingAndReport(shift) }
+        }
     }
 
     @JavascriptInterface
@@ -596,6 +633,12 @@ class CronoBusJsBridge(
 
     companion object {
         private const val TAG = "CronoBusJsBridge"
+
+        /**
+         * Scope de escrituras compartido por todas las instancias del puente (una por Activity).
+         * Nunca se cancela: vive lo mismo que el proceso, igual que la base y el sincronizador.
+         */
+        private val processScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         /** Nombre exacto del objeto inyectado en el contexto JavaScript. */
         const val JS_INTERFACE_NAME = "CronoBusNative"

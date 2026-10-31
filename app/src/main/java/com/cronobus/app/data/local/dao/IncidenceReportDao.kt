@@ -40,14 +40,17 @@ interface IncidenceReportDao {
     )
     suspend fun markAsSyncing(id: Long, attemptAtUtcMs: Long)
 
-    @Query("UPDATE incidence_reports SET syncStatus = 'SYNCED' WHERE id = :id")
+    // Auditoría Paso 3: las transiciones de salida de SYNCING solo aplican si el registro sigue
+    // en SYNCING. Si otro escritor lo devolvió a PENDING durante el envío (p. ej. updateEndShift),
+    // el cambio local no se pisa y el registro se reenvía en el siguiente ciclo.
+    @Query("UPDATE incidence_reports SET syncStatus = 'SYNCED' WHERE id = :id AND syncStatus = 'SYNCING'")
     suspend fun markAsSynced(id: Long)
 
     @Query(
         """
         UPDATE incidence_reports
         SET syncStatus = 'FAILED', lastSyncAttemptMs = :attemptAtUtcMs
-        WHERE id = :id
+        WHERE id = :id AND syncStatus = 'SYNCING'
         """,
     )
     suspend fun markAsFailed(id: Long, attemptAtUtcMs: Long)
@@ -61,7 +64,7 @@ interface IncidenceReportDao {
                 WHEN retryCount + 1 >= :maxRetries THEN 'FAILED'
                 ELSE 'PENDING'
             END
-        WHERE id = :id
+        WHERE id = :id AND syncStatus = 'SYNCING'
         """,
     )
     suspend fun incrementRetryCount(id: Long, attemptAtUtcMs: Long, maxRetries: Int)

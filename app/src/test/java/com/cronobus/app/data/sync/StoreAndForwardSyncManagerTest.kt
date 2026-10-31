@@ -98,6 +98,49 @@ class StoreAndForwardSyncManagerTest {
         manager.shutdown()
     }
 
+    /**
+     * Auditoría Paso 3: si el turno se cierra (updateEndShift → PENDING) mientras su versión
+     * anterior está en vuelo, el ACK del envío viejo no debe marcarlo SYNCED; si lo hiciera,
+     * la hora de fin nunca llegaría al backend.
+     */
+    @Test
+    fun `shift closed while in flight is re-queued instead of marked synced`() = runTest {
+        database.shiftLogDao().insert(shift(startAtUtcMs = 100L))
+
+        val shiftDao = database.shiftLogDao()
+        val transport = object : SyncTransport {
+            val sentEndTimes = mutableListOf<Long?>()
+            override suspend fun send(item: SyncQueueItem): SyncOutcome {
+                sentEndTimes += (item as SyncQueueItem.Shift).entity.endTimestampUtcMs
+                if (sentEndTimes.size == 1) shiftDao.updateEndShift("shift-1", 900L, 900_000L)
+                return SyncOutcome.SUCCESS
+            }
+        }
+        val manager = manager(transport, StandardTestDispatcher(testScheduler))
+
+        manager.drainOnce()
+
+        // Primer envío sin hora de fin; el ACK no pisa el PENDING, así que el siguiente lote del
+        // mismo ciclo reenvía la versión cerrada y solo entonces queda SYNCED.
+        assertEquals(listOf<Long?>(null, 900L), transport.sentEndTimes)
+        assertEquals(0, shiftDao.getPendingShifts(10).size)
+
+        manager.shutdown()
+    }
+
+    @Test
+    fun `terminal transitions are ignored unless the row is SYNCING`() = runTest {
+        val dao = database.checkpointEventDao()
+        val id = dao.insert(checkpoint(atUtcMs = 100L))
+
+        dao.markAsSynced(id)
+        dao.markAsFailed(id, 1L)
+        dao.incrementRetryCount(id, 1L, maxRetries = 1)
+
+        val row = dao.getPendingEvents(10).single()
+        assertEquals(0, row.retryCount)
+    }
+
     private fun manager(
         transport: SyncTransport,
         dispatcher: CoroutineDispatcher,

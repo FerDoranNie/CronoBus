@@ -69,14 +69,17 @@ interface ShiftLogDao {
     )
     suspend fun markAsSyncing(shiftId: String, attemptAtUtcMs: Long)
 
-    @Query("UPDATE shift_logs SET syncStatus = 'SYNCED' WHERE shiftId = :shiftId")
+    // Auditoría Paso 3: las transiciones de salida de SYNCING solo aplican si el registro sigue
+    // en SYNCING. Si otro escritor lo devolvió a PENDING durante el envío (p. ej. updateEndShift),
+    // el cambio local no se pisa y el registro se reenvía en el siguiente ciclo.
+    @Query("UPDATE shift_logs SET syncStatus = 'SYNCED' WHERE shiftId = :shiftId AND syncStatus = 'SYNCING'")
     suspend fun markAsSynced(shiftId: String)
 
     @Query(
         """
         UPDATE shift_logs
         SET syncStatus = 'FAILED', lastSyncAttemptMs = :attemptAtUtcMs
-        WHERE shiftId = :shiftId
+        WHERE shiftId = :shiftId AND syncStatus = 'SYNCING'
         """,
     )
     suspend fun markAsFailed(shiftId: String, attemptAtUtcMs: Long)
@@ -90,7 +93,7 @@ interface ShiftLogDao {
                 WHEN retryCount + 1 >= :maxRetries THEN 'FAILED'
                 ELSE 'PENDING'
             END
-        WHERE shiftId = :shiftId
+        WHERE shiftId = :shiftId AND syncStatus = 'SYNCING'
         """,
     )
     suspend fun incrementRetryCount(shiftId: String, attemptAtUtcMs: Long, maxRetries: Int)
