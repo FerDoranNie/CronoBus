@@ -53,7 +53,9 @@ class PassengerEtaCalculatorUseCase(
         calculatedAtEpochMs: Long,
         isStaleCache: Boolean = false,
     ): PassengerEtaQuote {
+        // Auditoría Paso 3 (LGPDPPSO): solo se publican los niveles agregados permitidos.
         val occupancy = occupancyLevel.trim().uppercase(Locale.ROOT)
+            .takeIf { it in ALLOWED_OCCUPANCY } ?: UNKNOWN_OCCUPANCY
         if (routeId.isBlank() || stopId.isBlank() || !unitPosition.isValid || !stopPosition.isValid) {
             return PassengerEtaQuote(
                 routeId = routeId,
@@ -106,5 +108,7 @@ class PassengerEtaCalculatorUseCase(
 
     private companion object {
         const val SECONDS_PER_MINUTE = 60.0
+        const val UNKNOWN_OCCUPANCY = "DESCONOCIDO"
+        val ALLOWED_OCCUPANCY = setOf("BAJA", "MEDIA", "LLENO")
     }
 }

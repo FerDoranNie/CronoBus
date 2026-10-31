@@ -56,6 +56,23 @@ class DisputePhotoStore(
         return DisputePhoto(file = file, uri = uri)
     }
 
+    /**
+     * Reconstruye una captura a partir del nombre guardado en `onSaveInstanceState`.
+     * Solo acepta el patrón generado por [createPhoto] para impedir *path traversal*.
+     */
+    fun fromFileName(fileName: String): DisputePhoto? {
+        if (!SAFE_NAME.matches(fileName)) return null
+        val file = File(photoDirectory, fileName)
+        val uri = runCatching {
+            FileProvider.getUriForFile(
+                appContext,
+                "${appContext.packageName}$FILE_PROVIDER_SUFFIX",
+                file,
+            )
+        }.getOrNull() ?: return null
+        return DisputePhoto(file = file, uri = uri)
+    }
+
     /** La cámara pudo cancelar o escribir un archivo de 0 bytes. */
     fun isUsable(photo: DisputePhoto): Boolean =
         photo.file.exists() && photo.file.length() > 0L
@@ -76,5 +93,6 @@ class DisputePhotoStore(
         const val PHOTO_DIRECTORY = "dispute_photos"
         const val FILE_PROVIDER_SUFFIX = ".fileprovider"
         const val DEFAULT_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
+        val SAFE_NAME = Regex("^dispute_[0-9a-fA-F-]{36}\\.jpg$")
     }
 }

@@ -109,7 +109,15 @@ class FinancialCsvExporter(
         return String.format(Locale.US, "%.2f", safe)
     }
 
-    private fun escape(value: String): String {
+    /**
+     * Auditoría Paso 3 (OWASP CSV Injection): `unitId` y `routeId` vienen de texto libre del
+     * conductor. Un valor como `=HYPERLINK(...)` se ejecutaría como fórmula en Excel/Sheets.
+     */
+    internal fun neutralizeFormula(value: String): String =
+        if (value.isNotEmpty() && value[0] in FORMULA_PREFIXES) "'$value" else value
+
+    private fun escape(raw: String): String {
+        val value = neutralizeFormula(raw)
         val needsQuoting = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
         val escaped = value.replace("\"", "\"\"")
         return if (needsQuoting) "\"$escaped\"" else escaped
@@ -120,6 +128,7 @@ class FinancialCsvExporter(
         const val FILE_PROVIDER_SUFFIX = ".fileprovider"
         const val UTF8_BOM = "\uFEFF"
         const val CRLF = "\r\n"
+        val FORMULA_PREFIXES = charArrayOf('=', '+', '-', '@', '\t', '\r')
 
         val HEADER = listOf(
             "unit_id",

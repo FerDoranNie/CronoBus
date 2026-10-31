@@ -32,7 +32,7 @@ import com.cronobus.app.data.local.entity.ShiftLogEntity
         FineDisputeEntity::class,
         ShiftLogEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(CronoBusTypeConverters::class)
@@ -51,6 +51,17 @@ abstract class CronoBusDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "cronobus.db"
 
+        /** v2: índice compuesto para el headway; no toca datos (evidencia intacta). */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_checkpoint_events_checkpointId_routeId_timestampUtcMs` " +
+                        "ON `checkpoint_events` (`checkpointId`, `routeId`, `timestampUtcMs`)",
+                )
+            }
+        }
+
         @Volatile
         private var instance: CronoBusDatabase? = null
 
@@ -65,6 +76,7 @@ abstract class CronoBusDatabase : RoomDatabase() {
 
         private fun build(context: Context): CronoBusDatabase =
             Room.databaseBuilder(context, CronoBusDatabase::class.java, DATABASE_NAME)
+                .addMigrations(MIGRATION_1_2)
                 // Sin fallback destructivo: una migración faltante debe fallar en QA, no en la calle.
                 .build()
     }

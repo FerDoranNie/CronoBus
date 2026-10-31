@@ -974,8 +974,9 @@
       const fineId = document.getElementById('dispute-fine-id')?.value || 'U14-DEMO-001';
       const reason = document.getElementById('dispute-reason')?.value || 'Apelación con telemetría GPS y reporte de bloqueo en el tramo.';
       if (window.CronoBusNative && typeof window.CronoBusNative.disputeFine === 'function') {
+        // Auditoría Paso 3: el modal se cierra al recibir `disputeFiled`; si el nativo
+        // rechaza (sin GPS / sin turno) el conductor conserva motivo y foto para reintentar.
         window.CronoBusNative.disputeFine(fineId, reason);
-        closeDisputeModal(false);
         return;
       }
       alert(`Apelación registrada para sanción ${fineId}:\n"${reason}"\nEvidencia fotográfica vinculada.`);
@@ -1401,20 +1402,8 @@
           badge.innerHTML = 'GPS BLOQUEADO';
         }
 
-        const container = document.getElementById('admin-alerts-container');
-        if (container) {
-          container.insertAdjacentHTML('afterbegin', `
-            <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#ba1a1a] rounded-md p-3" data-native-alert>
-              <div class="flex justify-between items-start mb-1">
-                <span class="text-xs font-bold text-[#ba1a1a]">ANTI-SABOTAJE</span>
-                <span class="text-[10px] text-[#444748] font-mono">Ahora</span>
-              </div>
-              <p class="text-xs mb-2 text-[#1a1c1c]"></p>
-            </div>
-          `);
-          const description = container.querySelector('[data-native-alert] p');
-          if (description) description.innerText = payload.description || payload.type;
-        }
+        // Auditoría Paso 3: antes se insertaba HTML sin tope (fuga de DOM en turnos largos).
+        addAdminAlert('ANTI-SABOTAJE', payload.description || payload.type, '#ba1a1a');
       },
       onNativeEvent(payload) {
         if (!payload) return;
@@ -1428,6 +1417,7 @@
         } else if (payload.event === 'incidenceReported') {
           alert(`Incidencia guardada en el dispositivo (pendiente de sincronizar: ${payload.pendingSyncCount}).`);
         } else if (payload.event === 'disputeFiled') {
+          closeDisputeModal(false);
           const statusEl = document.getElementById('photo-evidence-status');
           if (statusEl) {
             statusEl.innerText = 'Sin foto adjunta';

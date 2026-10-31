@@ -17,6 +17,8 @@ import com.cronobus.app.data.local.SyncStatus
         Index(value = ["syncStatus", "timestampUtcMs"]),
         Index(value = ["shiftId"]),
         Index(value = ["checkpointId"]),
+        // Auditoría Paso 3: cubre `getPreviousCrossing` (checkpoint + ruta + orden temporal).
+        Index(value = ["checkpointId", "routeId", "timestampUtcMs"]),
     ],
 )
 data class CheckpointEventEntity(

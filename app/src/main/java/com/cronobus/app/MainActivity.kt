@@ -89,6 +89,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Auditoría Paso 3 (S3): el URI pendiente del permiso de cámara se perdía al rotar.
+        pendingCaptureUri = savedInstanceState?.let {
+            @Suppress("DEPRECATION")
+            it.getParcelable<Uri>(STATE_PENDING_CAPTURE_URI)
+        }
+
         syncManager = StoreAndForwardSyncManager.getInstance(this)
         bridge = CronoBusJsBridge(this, syncManager = syncManager).apply {
             onLocationPermissionRequired = {
@@ -105,6 +111,8 @@ class MainActivity : ComponentActivity() {
                 if (!isFinishing && !isDestroyed) shareCsv(uri)
             }
         }
+
+        bridge.restorePendingPhoto(savedInstanceState?.getString(STATE_PENDING_PHOTO_NAME))
 
         observeNativeStreams()
 
@@ -235,6 +243,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingCaptureUri?.let { outState.putParcelable(STATE_PENDING_CAPTURE_URI, it) }
+        bridge.pendingPhotoFileName()?.let { outState.putString(STATE_PENDING_PHOTO_NAME, it) }
+    }
+
     override fun onDestroy() {
         bridge.close()
         super.onDestroy()
@@ -242,6 +256,8 @@ class MainActivity : ComponentActivity() {
 }
 
 private const val TAG = "CronoBusMainActivity"
+private const val STATE_PENDING_CAPTURE_URI = "cronobus.pendingCaptureUri"
+private const val STATE_PENDING_PHOTO_NAME = "cronobus.pendingPhotoName"
 private const val LOCAL_ENTRY_URL = "file:///android_asset/cronobus.html"
 
 @Composable

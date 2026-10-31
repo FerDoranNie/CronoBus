@@ -46,6 +46,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -113,6 +114,13 @@ class CronoBusJsBridge(
     private val scope = processScope
     private val mainHandler = Handler(Looper.getMainLooper())
     private val shiftMutex = Mutex()
+
+    /**
+     * Auditoría Paso 3 (S3): cada ENTER lanzaba una corrutina independiente. Dos cruces casi
+     * simultáneos podían leer el mismo `getPreviousCrossing` antes de insertar y duplicar headway
+     * y sanciones en el ledger. Se serializa el registro completo del checador.
+     */
+    private val checkpointMutex = Mutex()
 
     /** Evita turnos duplicados por doble toque en "Iniciar Turno" mientras el primero persiste. */
     private val shiftStartInFlight = AtomicBoolean(false)
@@ -511,7 +519,11 @@ class CronoBusJsBridge(
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
                 )
                 val localId = disputeDao.insert(dispute)
-                SessionState.pendingPhoto = null
+                // Auditoría Paso 3 (S3): si el conductor tomó otra foto mientras se insertaba,
+                // no se debe descartar la nueva (quedaría huérfana y sin evidencia).
+                synchronized(SessionState) {
+                    if (SessionState.pendingPhoto === photo) SessionState.pendingPhoto = null
+                }
 
                 pushEvent(
                     "disputeFiled",
@@ -573,6 +585,19 @@ class CronoBusJsBridge(
             Log.e(TAG, "No se pudo preparar el archivo de evidencia.", failure)
             pushError("captureDisputePhoto", "No se pudo preparar la cámara.")
         }
+    }
+
+    /** Nombre del archivo de evidencia pendiente, para `onSaveInstanceState`. */
+    fun pendingPhotoFileName(): String? = SessionState.pendingPhoto?.file?.name
+
+    /**
+     * Auditoría Paso 3 (S3): en gama baja Android suele matar el proceso mientras la app de cámara
+     * está al frente. Al volver, `SessionState` está vacío y la foto se reportaba como fallida y
+     * quedaba huérfana en caché. La Activity restaura aquí el nombre guardado en su estado.
+     */
+    fun restorePendingPhoto(fileName: String?) {
+        if (fileName.isNullOrBlank() || SessionState.pendingPhoto != null) return
+        SessionState.pendingPhoto = photoStore.fromFileName(fileName)
     }
 
     /** Invocado por MainActivity cuando la app de cámara termina. */
@@ -910,6 +935,19 @@ class CronoBusJsBridge(
     // ---------------------------------------------------------------------------------------------
 
     private suspend fun recordCheckpoint(event: GeofenceEvent) {
+        try {
+            checkpointMutex.withLock { recordCheckpointLocked(event) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            // Auditoría Paso 3 (S3): `assessCrossing` lee Room sin try; un error de disco
+            // tumbaba el proceso desde `processScope`.
+            Log.e(TAG, "No se pudo evaluar el cruce de ${event.zoneName}.", failure)
+            pushError("geofence", "No se pudo evaluar el cruce del checador.")
+        }
+    }
+
+    private suspend fun recordCheckpointLocked(event: GeofenceEvent) {
         val shift = currentShiftOrLoad() ?: return
         val observedAtUtcMs = System.currentTimeMillis()
         val forceMajeure = forceMajeureUseCase.evaluate(
@@ -1093,7 +1131,7 @@ class CronoBusJsBridge(
                 routeId = request.routeId,
                 stopId = stop.id,
                 stopName = stop.name,
-                unitId = activeShift?.unitId ?: DEFAULT_UNIT_ID,
+                unitId = activeShift?.unitId ?: UNKNOWN_UNIT_ID,
                 unitPosition = update.position,
                 stopPosition = stop.position,
                 averageSpeedMps = averageFilteredSpeed(update.speedMps),
@@ -1298,7 +1336,13 @@ class CronoBusJsBridge(
          * Scope de escrituras compartido por todas las instancias del puente (una por Activity).
          * Nunca se cancela: vive lo mismo que el proceso, igual que la base y el sincronizador.
          */
-        private val processScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val processScope = CoroutineScope(
+            SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, failure ->
+                // Auditoría Paso 3 (S3): con SupervisorJob una excepción no capturada en un
+                // `launch` llega al handler por defecto y Android mata el proceso (y el GPS).
+                Log.e(TAG, "Excepción no controlada en el puente nativo.", failure)
+            },
+        )
 
         /** Nombre exacto del objeto inyectado en el contexto JavaScript. */
         const val JS_INTERFACE_NAME = "CronoBusNative"
@@ -1313,7 +1357,7 @@ class CronoBusJsBridge(
         private const val FINANCIAL_SHIFT_LIMIT = 50
         private const val SAAS_FEE_PER_UNIT_MXN = 750.0
         private const val DEFAULT_FLEET_SIZE = 8
-        private const val DEFAULT_UNIT_ID = "14"
+        private const val UNKNOWN_UNIT_ID = "N/D"
 
         private const val MAX_ALIAS_LENGTH = 64
         private const val MAX_UNIT_LENGTH = 32

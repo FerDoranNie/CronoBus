@@ -16,8 +16,9 @@ import androidx.activity.result.contract.ActivityResultContract
  * ambos, varias apps de cámara (Samsung, Xiaomi) devuelven `RESULT_CANCELED` o escriben en una ruta
  * no autorizada al recibir un URI de `FileProvider`.
  *
- * No requiere `CAMERA` en tiempo de ejecución: la captura la realiza la app de cámara del sistema,
- * que ya tiene su propio permiso. La app solo recibe la foto mediante el URI concedido.
+ * Auditoría Paso 3: como el manifiesto **declara** `CAMERA`, Android lanza `SecurityException` en
+ * `ACTION_IMAGE_CAPTURE` si el permiso no está concedido. `MainActivity.requestCameraCapture`
+ * lo solicita antes de lanzar este contrato; no eliminar esa verificación.
  */
 class CapturePhotoContract : ActivityResultContract<Uri, Boolean>() {
 
