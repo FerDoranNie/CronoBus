@@ -1326,6 +1326,15 @@
         window.__cronobusLastFix = payload;
         window.__cronobusOccupancy = payload.occupancy;
         window.__cronobusNativeActive = true;
+        try {
+          localStorage.setItem('cronobus_last_telemetry', JSON.stringify({
+            lat: payload.lat,
+            lng: payload.lng,
+            speedKmh: payload.speedKmh,
+            occupancy: payload.occupancy,
+            timestampUtcMs: payload.timestampUtcMs
+          }));
+        } catch (_) {}
 
         const nativeUnit = units.find(u => u.id === 14);
         const lat = Number(payload.lat);
@@ -1379,9 +1388,23 @@
       },
       onPassengerEta(payload) {
         if (!payload) return;
+        try {
+          localStorage.setItem('cronobus_last_eta_quote', JSON.stringify(payload));
+        } catch (_) {}
         renderPassengerEta(payload);
       },
       onPassengerEtaUnavailable(payload) {
+        try {
+          const cachedRaw = localStorage.getItem('cronobus_last_eta_quote');
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw);
+            const selectedStop = document.getElementById('passenger-stop-select')?.value;
+            if (cached && (!selectedStop || cached.stopId === selectedStop)) {
+              renderPassengerEta(Object.assign({}, cached, { isStaleCache: true }));
+              return;
+            }
+          }
+        } catch (_) {}
         const etaEl = document.getElementById('eta-mins');
         if (etaEl) etaEl.innerText = '—';
         const contextEl = document.getElementById('eta-context');

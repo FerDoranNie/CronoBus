@@ -165,6 +165,14 @@ class LocationTrackingService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                if (intent == null && !hasBackgroundLocationPermission(this)) {
+                    Log.w(
+                        TAG,
+                        "Reinicio START_STICKY sin ACCESS_BACKGROUND_LOCATION; el turno se reanudará al volver al frente.",
+                    )
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 if (!promoteToForeground()) {
                     stopSelf()
                     return START_NOT_STICKY
@@ -532,5 +540,21 @@ class LocationTrackingService : Service() {
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION,
             ) == PackageManager.PERMISSION_GRANTED
+
+        /**
+         * En Android 10+ (API 29+) un reinicio del servicio por el sistema (`START_STICKY` con
+         * `intent == null`) desde segundo plano requiere `ACCESS_BACKGROUND_LOCATION`. Si el
+         * conductor solo concedió "Mientras está en uso", la guardia evita un crash y el puente
+         * reanuda el turno automáticamente cuando la Activity vuelve al frente.
+         */
+        fun hasBackgroundLocationPermission(context: Context): Boolean =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
     }
 }

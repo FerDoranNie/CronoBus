@@ -243,6 +243,15 @@ class CronoBusJsBridge(
         )
         LocationTrackingService.latestUpdate.value?.let(::pushTelemetry)
         scope.launch {
+            currentShiftOrLoad()?.let { shift ->
+                LocationTrackingService.setGeofenceZones(RouteCatalog.zonesFor(shift.routeId))
+                if (
+                    !LocationTrackingService.isRunning.value &&
+                    LocationTrackingService.hasLocationPermission(appContext)
+                ) {
+                    mainHandler.post { startTrackingAndReport(shift) }
+                }
+            }
             refreshDispatchQueue()
             pushFinancialSummary()
         }

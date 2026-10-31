@@ -64,34 +64,39 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
 
 ---
 
-## 📱 Fase 4: Lógica de Negocio en las 3 Vistas (Conductor, Admin, Pasajero) (🔄 En Curso — Semana 3)
-- [ ] **4.1 Módulo Conductor (Operación Real):**
+## 📱 Fase 4: Lógica de Negocio en las 3 Vistas (Conductor, Admin, Pasajero) (Completado en Semana 3)
+- [x] **4.1 Módulo Conductor (Operación Real):**
   - [x] Flujo de inicio de turno: firma de consentimiento legal LGPDPPSO + checklist rápido de mantenimiento preventivo (frenos, luces, aceite).
-  - [ ] Cálculo real de **Headway** dinámico (`HeadwayCalculatorUseCase`), persistencia automática de `CheckpointEventEntity` al cruzar geocercas y actualización visual del Checador Digital.
-  - [ ] Estrategia híbrida de `ACCESS_BACKGROUND_LOCATION` en Android 14+ (guardia en `START_STICKY` con `intent == null` + reanudación automática de turno abierto al volver al frente).
-  - [ ] Captura de evidencia fotográfica (URI local segura) al pulsar **Apelar Multa**.
-  - [ ] Modo nocturno automático / conmutable (`CronoBus Dark Mode`) para conducción segura de noche.
-- [ ] **4.2 Módulo Administración y Despacho:**
-  - [ ] Algoritmo de **Exención Automática por Fuerza Mayor** (`EvaluateForceMajeureUseCase`): anular multas en un tramo si $\ge 3$ unidades distintas reportan bloqueo/tráfico en un radio de $500\text{ m}$ dentro de una ventana de $15\text{ min}$.
-  - [ ] Algoritmo de rotación de salidas y despacho equitativo en bases (`FairDispatchRotationUseCase`).
-  - [ ] Generación y exportación real de `.csv` con métricas del Modelo Financiero Mixto (SaaS + Multas + Bonos + Exenciones).
-- [ ] **4.3 Módulo Pasajero (Público):**
-  - [ ] Selección funcional de ruta y parada con recálculo dinámico de ETA (`PassengerEtaCalculatorUseCase`) según velocidad media filtrada del tramo y retrasos/bloqueos reportados.
-  - [ ] Caché local (`DataStore` / `localStorage` sincronizado) de la última posición conocida y ETA estimado para resiliencia en pérdidas momentáneas de red.
+  - [x] Cálculo real de **Headway** dinámico ([`HeadwayCalculatorUseCase.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/usecase/HeadwayCalculatorUseCase.kt)), persistencia automática serializada (`checkpointMutex`) de [`CheckpointEventEntity`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/local/entity/CheckpointEventEntity.kt) al cruzar geocercas (`RouteCatalog`) y actualización visual del Checador Digital.
+  - [x] Estrategia híbrida de `ACCESS_BACKGROUND_LOCATION` en Android 14+ (guardia `hasBackgroundLocationPermission` en `START_STICKY` con `intent == null` + reanudación automática de turno abierto en `onPageReady` al volver al frente).
+  - [x] Captura de evidencia fotográfica ([`DisputePhotoStore.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/export/DisputePhotoStore.kt) + [`CapturePhotoContract.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/bridge/CapturePhotoContract.kt) con `FileProvider` y restauración `onSaveInstanceState`) al pulsar **Apelar Multa**.
+  - [x] Modo nocturno conmutable (`CronoBus Dark Mode`) en [`classic_signal_offline.css`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/assets/classic_signal_offline.css) y [`cronobus.html`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/assets/cronobus.html) persistido en `localStorage`.
+- [x] **4.2 Módulo Administración y Despacho:**
+  - [x] Algoritmo de **Exención Automática por Fuerza Mayor** ([`EvaluateForceMajeureUseCase.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/usecase/EvaluateForceMajeureUseCase.kt)): anular multas en un tramo si $\ge 3$ unidades distintas reportan bloqueo/tráfico en un radio Haversine de $500\text{ m}$ dentro de una ventana de $15\text{ min}$.
+  - [x] Algoritmo de rotación de salidas y despacho equitativo en bases ([`FairDispatchRotationUseCase.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/usecase/FairDispatchRotationUseCase.kt)).
+  - [x] Generación y exportación real de `.csv` ([`FinancialCsvExporter.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/export/FinancialCsvExporter.kt)) con métricas del Modelo Financiero Mixto (SaaS + Multas Brutas/Condonadas/Netas + Bonos) y neutralización anti-inyección de fórmulas OWASP.
+- [x] **4.3 Módulo Pasajero (Público):**
+  - [x] Selección funcional de ruta y parada con recálculo dinámico de ETA ([`PassengerEtaCalculatorUseCase.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/domain/usecase/PassengerEtaCalculatorUseCase.kt)) según velocidad media filtrada del tramo y retrasos/bloqueos reportados.
+  - [x] Caché local (`localStorage` sincronizado: `cronobus_last_eta_quote` y `cronobus_last_telemetry`) de la última posición conocida y ETA estimado (`isStaleCache = true`) para resiliencia en pérdidas momentáneas de red/GPS.
 
 ---
 
-## 🧪 Fase 5: Pruebas Automatizadas, Auditoría y QA
-- [ ] **5.1 Pruebas Unitarias (JUnit 4 + Coroutines Test):**
+## 🧪 Fase 5: Pruebas Automatizadas, Auditoría y QA (🔄 En Curso — Semana 4)
+- [x] **5.1 Pruebas Unitarias (JUnit 4 + Coroutines Test):**
   - [x] Tests para `KalmanLocationFilter` (`KalmanLocationFilterTest`, `KalmanRobustnessTest`), `GeofenceEngine` (`GeofenceEngineTest`) y `TamperDetector` (`TamperDetectorTest`, `TamperClockSourceTest`) — **31 pruebas en verde**.
-  - [ ] Tests para regla de exención por fuerza mayor (3 unidades / 500m / 15m), cálculo de headway/multas, rotación de despacho y ETA de pasajero.
-- [ ] **5.2 Pruebas de Base de Datos y Store & Forward (Robolectric + Room):**
+  - [x] Tests para regla de exención por fuerza mayor ([`EvaluateForceMajeureUseCaseTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/domain/usecase/EvaluateForceMajeureUseCaseTest.kt)), cálculo de headway/multas ([`HeadwayCalculatorUseCaseTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/domain/usecase/HeadwayCalculatorUseCaseTest.kt)), rotación de despacho ([`FairDispatchRotationUseCaseTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/domain/usecase/FairDispatchRotationUseCaseTest.kt)), ETA de pasajero ([`PassengerEtaCalculatorUseCaseTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/domain/usecase/PassengerEtaCalculatorUseCaseTest.kt)) y exportación segura CSV ([`FinancialCsvExporterTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/data/export/FinancialCsvExporterTest.kt)).
+- [x] **5.2 Pruebas de Base de Datos y Store & Forward (Robolectric + Room):**
   - [x] `StoreAndForwardSyncManagerTest` (4 tests en verde: vaciado cronológico global `UNION ALL`, retención ante falla transitoria, re-encolado de turno cerrado en vuelo y guardia `SYNCING`).
-  - [ ] Ampliar pruebas de persistencia de cruces de geocerca y consultas espaciales de Fuerza Mayor en Room.
+  - [x] Pruebas de persistencia de cruces de geocerca, consultas espaciales de Fuerza Mayor en Room y validación de migración no destructiva `1 → 2` ([`CronoBusDatabaseMigrationTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/data/local/CronoBusDatabaseMigrationTest.kt)).
 - [ ] **5.3 Pruebas de Regresión Visual (Roborazzi):**
   - [x] Migrar [`GreetingScreenshotTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/GreetingScreenshotTest.kt) a `com.cronobus.app` con tema *Classic Signal*.
   - [ ] Expandir capturas de pantalla para las vistas principales.
-- [ ] **5.4 Verificación de Build & Lint:**
+- [ ] **5.4 Pendientes Registrados en Auditoría del Paso 3 (Semana 3 → Semana 4):**
+  - [ ] Persistir el *ledger* financiero de sesión (`SessionState.ledger` / sanciones y condonaciones por unidad) en Room para que sobreviva a muerte del proceso antes de exportar el `.csv`.
+  - [ ] Migrar el directorio de `dispute_photos` de `cache-path` a `files-path` en `res/xml/file_paths.xml` y [`DisputePhotoStore.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/export/DisputePhotoStore.kt) para evitar que el sistema operativo purgue evidencias fotográficas pendientes de sincronizar bajo presión de almacenamiento.
+  - [ ] Completar empaquetado local de `Leaflet.js` en `assets/` y migración de entrada a `WebViewAssetLoader` (`https://appassets.androidplatform.net/`).
+- [ ] **5.5 Verificación de Build & Lint:**
   - [x] Semana 1: `./gradlew testDebugUnitTest assembleDebug` en verde (49 tareas ejecutadas, 31 tests OK).
   - [x] Semana 2: `./gradlew testDebugUnitTest assembleDebug` en verde (49 tareas ejecutadas, 35 tests OK, KSP Room + Robolectric OK).
+  - [x] Semana 3: `./gradlew testDebugUnitTest assembleDebug` en verde (66 tests unitarios/Robolectric OK, migración Room 1→2 validada y APK Debug ensamblado).
   - [ ] Cierre final: `./gradlew lintDebug`, `./gradlew testDebugUnitTest` y `./gradlew assembleDebug` sin warnings críticos ni errores.
