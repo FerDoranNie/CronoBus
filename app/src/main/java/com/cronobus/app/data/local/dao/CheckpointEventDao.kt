@@ -37,6 +37,29 @@ interface CheckpointEventDao {
     @Query("SELECT * FROM checkpoint_events WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<Long>): List<CheckpointEventEntity>
 
+    /**
+     * Cruce más reciente del **mismo punto de control** hecho por otra unidad de la misma ruta.
+     * Es la base del headway real: el intervalo se mide contra la unidad precedente, no contra el
+     * propio historial. Se excluye al evaluador para que un doble cruce no se compare consigo mismo.
+     */
+    @Query(
+        """
+        SELECT * FROM checkpoint_events
+        WHERE checkpointId = :checkpointId
+          AND routeId = :routeId
+          AND unitId != :unitId
+          AND timestampUtcMs <= :beforeUtcMs
+        ORDER BY timestampUtcMs DESC, elapsedRealtimeNanos DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getPreviousCrossing(
+        checkpointId: String,
+        routeId: String,
+        unitId: String,
+        beforeUtcMs: Long,
+    ): CheckpointEventEntity?
+
     @Query(
         """
         UPDATE checkpoint_events

@@ -1,6 +1,7 @@
 package com.cronobus.app.bridge
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -8,21 +9,42 @@ import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.room.withTransaction
+import com.cronobus.app.data.export.DisputePhoto
+import com.cronobus.app.data.export.DisputePhotoStore
+import com.cronobus.app.data.export.FinancialCsvExporter
 import com.cronobus.app.data.local.CronoBusDatabase
 import com.cronobus.app.data.local.IncidenceType
 import com.cronobus.app.data.local.OccupancyLevel
+import com.cronobus.app.data.local.dao.CheckpointEventDao
+import com.cronobus.app.data.local.dao.IncidenceReportDao
+import com.cronobus.app.data.local.entity.CheckpointEventEntity
 import com.cronobus.app.data.local.entity.FineDisputeEntity
 import com.cronobus.app.data.local.entity.IncidenceReportEntity
 import com.cronobus.app.data.local.entity.ShiftLogEntity
 import com.cronobus.app.data.sync.StoreAndForwardSyncManager
+import com.cronobus.app.domain.model.DispatchQueueSlot
+import com.cronobus.app.domain.model.FinancialCsvRow
+import com.cronobus.app.domain.model.ForceMajeureResult
+import com.cronobus.app.domain.model.GeoPoint
 import com.cronobus.app.domain.model.GeofenceEvent
+import com.cronobus.app.domain.model.GeofenceTransition
+import com.cronobus.app.domain.model.HeadwayAssessment
+import com.cronobus.app.domain.model.HeadwayStatus
 import com.cronobus.app.domain.model.LocationUpdate
+import com.cronobus.app.domain.model.PassengerEtaQuote
 import com.cronobus.app.domain.model.TamperEvent
 import com.cronobus.app.domain.model.TamperType
+import com.cronobus.app.domain.route.RouteCatalog
+import com.cronobus.app.domain.usecase.DispatchCandidate
+import com.cronobus.app.domain.usecase.EvaluateForceMajeureUseCase
+import com.cronobus.app.domain.usecase.FairDispatchRotationUseCase
+import com.cronobus.app.domain.usecase.HeadwayCalculatorUseCase
+import com.cronobus.app.domain.usecase.PassengerEtaCalculatorUseCase
 import com.cronobus.app.service.LocationTrackingService
 import java.lang.ref.WeakReference
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,18 +52,23 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * Puente bidireccional entre la SPA local ([cronobus.html]) y el núcleo nativo.
  *
  * ## Dirección JS → Kotlin (`window.CronoBusNative`)
- * Solo se exponen cuatro comandos de negocio, con tipos primitivos (el puente de Android no
- * admite objetos ni callbacks):
+ * Se exponen comandos de negocio con tipos primitivos (el puente de Android no admite objetos ni
+ * callbacks):
  * - [startShift]: registra el turno con checklist LFT/LGPDPPSO y arranca el GPS en primer plano.
  * - [reportIncidence]: persiste una incidencia georreferenciada en la cola Store & Forward.
- * - [disputeFine]: guarda la apelación con la telemetría GPS adjunta como evidencia.
+ * - [disputeFine]: guarda la apelación con la telemetría GPS y la foto de evidencia adjunta.
  * - [reportOccupancy]: actualiza el aforo agregado (`BAJA` / `MEDIA` / `LLENO`).
+ * - [captureDisputePhoto] / [discardDisputePhoto]: captura y libera evidencia con FileProvider.
+ * - [exportFinancialCsv]: genera el CSV real del Modelo Financiero Mixto.
+ * - [requestPassengerEta]: cotiza el arribo al pasajero con velocidad Kalman y retrasos.
+ * - [requestDispatchQueue] / [dispatchNextUnit]: cola rotativa equitativa del despacho.
  *
  * ## Dirección Kotlin → JS (`window.CronoBus.*`)
  * Las llamadas se ejecutan siempre en el hilo principal mediante `evaluateJavascript`, con el
@@ -62,11 +89,20 @@ class CronoBusJsBridge(
     private val database: CronoBusDatabase = CronoBusDatabase.getInstance(context),
     private val syncManager: StoreAndForwardSyncManager =
         StoreAndForwardSyncManager.getInstance(context),
+    private val incidenceDao: IncidenceReportDao = database.incidenceReportDao(),
+    private val checkpointDao: CheckpointEventDao = database.checkpointEventDao(),
+    private val forceMajeureUseCase: EvaluateForceMajeureUseCase =
+        EvaluateForceMajeureUseCase(incidenceDao),
+    private val headwayUseCase: HeadwayCalculatorUseCase =
+        HeadwayCalculatorUseCase(checkpointDao),
+    private val etaUseCase: PassengerEtaCalculatorUseCase = PassengerEtaCalculatorUseCase(),
+    private val dispatchUseCase: FairDispatchRotationUseCase = FairDispatchRotationUseCase(),
+    private val csvExporter: FinancialCsvExporter = FinancialCsvExporter(context),
+    private val photoStore: DisputePhotoStore = DisputePhotoStore(context),
 ) {
 
     private val appContext = context.applicationContext
     private val shiftDao = database.shiftLogDao()
-    private val incidenceDao = database.incidenceReportDao()
     private val disputeDao = database.fineDisputeDao()
 
     /**
@@ -92,17 +128,82 @@ class CronoBusJsBridge(
     /**
      * Aforo agregado vigente. Se adjunta al siguiente [CheckpointEventEntity] que persista el
      * checador digital (Fase 4); el esquema no guarda ocupación como tabla independiente.
+     *
+     * Vive en [SessionState] para sobrevivir a una rotación de Activity: el conductor no debe
+     * perder el aforo reportado si gira el teléfono.
      */
-    @Volatile
-    var occupancyLevel: OccupancyLevel = OccupancyLevel.BAJA
-        private set
+    var occupancyLevel: OccupancyLevel
+        get() = SessionState.occupancyLevel
+        private set(value) {
+            SessionState.occupancyLevel = value
+        }
 
     /** La Activity registra aquí el lanzador de permisos de ubicación (debe correr en main). */
     @Volatile
     var onLocationPermissionRequired: (() -> Unit)? = null
 
+    /** La Activity registra aquí el lanzador de cámara para evidencia de apelaciones. */
+    @Volatile
+    var onCapturePhotoRequested: ((Uri) -> Unit)? = null
+
+    /** La Activity registra aquí la hoja de compartir del CSV exportado. */
+    @Volatile
+    var onCsvReadyForShare: ((Uri) -> Unit)? = null
+
     @Volatile
     private var awaitingLocationPermission = false
+
+    /**
+     * Métricas financieras de la sesión por unidad.
+     *
+     * `grossFinesMxn` incluye el monto teórico de sanciones que luego fueron condonadas; así el
+     * CSV puede mostrar bruto, condonado y neto sin perder trazabilidad.
+     */
+    private data class UnitFinancialState(
+        val routeId: String,
+        val grossFinesMxn: Double = 0.0,
+        val forgivenFinesMxn: Double = 0.0,
+        val assessments: Int = 0,
+        val exemptions: Int = 0,
+    ) {
+        val netFinesMxn: Double
+            get() = (grossFinesMxn - forgivenFinesMxn).coerceAtLeast(0.0)
+    }
+
+    private data class EtaRequest(
+        val routeId: String,
+        val stopId: String,
+    )
+
+    /**
+     * Estado de sesión compartido por las instancias del puente. La Activity se recrea en cada
+     * rotación, pero la cola de despacho, el aforo, las métricas del CSV y la foto pendiente deben
+     * sobrevivir mientras viva el proceso.
+     *
+     * El estado es de sesión, no persistente: al morir el proceso se reconstruye desde Room para
+     * turnos/colas, y el estado financiero vuelve a cero (Fase 5 lo persistirá).
+     */
+    private object SessionState {
+        val ledger = ConcurrentHashMap<String, UnitFinancialState>()
+        val lastDepartureByUnit = ConcurrentHashMap<String, Long>()
+        val speedSamples = ArrayDeque<Double>()
+        val dispatchMutex = Mutex()
+
+        @Volatile
+        var dispatchQueue: List<DispatchQueueSlot> = emptyList()
+
+        @Volatile
+        var pendingPhoto: DisputePhoto? = null
+
+        @Volatile
+        var lastEtaRequest: EtaRequest? = null
+
+        @Volatile
+        var lastEtaRefreshMs: Long = 0L
+
+        @Volatile
+        var occupancyLevel: OccupancyLevel = OccupancyLevel.BAJA
+    }
 
     init {
         // Recupera el turno tras recrear la Activity o reiniciar el proceso.
@@ -133,12 +234,18 @@ class CronoBusJsBridge(
             syncing = syncManager.isSyncing.value,
         )
         LocationTrackingService.latestUpdate.value?.let(::pushTelemetry)
+        scope.launch {
+            refreshDispatchQueue()
+            pushFinancialSummary()
+        }
     }
 
     fun close() {
         // Solo se desconecta la UI; las escrituras en curso terminan en `processScope`.
         webViewRef = null
         onLocationPermissionRequired = null
+        onCapturePhotoRequested = null
+        onCsvReadyForShare = null
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -227,6 +334,13 @@ class CronoBusJsBridge(
                 activeShift = shift
                 occupancyLevel = OccupancyLevel.BAJA
 
+                // Geocercas de la ruta: el checador digital nativo y el headway usan los mismos
+                // puntos que pinta la SPA. Para rutas sin catálogo se limpian las zonas previas.
+                LocationTrackingService.setGeofenceZones(RouteCatalog.zonesFor(route))
+
+                refreshDispatchQueue()
+                pushFinancialSummary()
+
                 if (LocationTrackingService.hasLocationPermission(appContext)) {
                     startTrackingAndReport(shift)
                 } else {
@@ -314,6 +428,14 @@ class CronoBusJsBridge(
                 )
                 val localId = incidenceDao.insert(report)
 
+                // La incidencia recién persistida ya cuenta para la ventana de fuerza mayor.
+                val forceMajeure = forceMajeureUseCase.evaluate(
+                    routeId = shift.routeId,
+                    position = GeoPoint(report.latitude, report.longitude),
+                    referenceTimeUtcMs = nowUtcMs,
+                )
+                pushForceMajeure(forceMajeure)
+
                 pushEvent(
                     "incidenceReported",
                     JSONObject()
@@ -322,8 +444,11 @@ class CronoBusJsBridge(
                         .put("shiftId", shift.shiftId)
                         .put("lat", fix.position.latitude)
                         .put("lng", fix.position.longitude)
+                        .put("forceMajeureExempt", forceMajeure.isExempt)
                         .put("pendingSyncCount", syncManager.pendingCount.value),
                 )
+
+                refreshPassengerEtaIfRequested()
             } catch (failure: Throwable) {
                 Log.e(TAG, "No fue posible guardar la incidencia.", failure)
                 pushError("reportIncidence", "No se pudo persistir la incidencia.")
@@ -357,6 +482,8 @@ class CronoBusJsBridge(
                     return@launch
                 }
 
+                // Solo se adjunta una captura completa; una cámara cancelada no deja evidencia rota.
+                val photo = SessionState.pendingPhoto?.takeIf(photoStore::isUsable)
                 val nowUtcMs = System.currentTimeMillis()
                 val telemetry = JSONObject()
                     .put("schemaVersion", TELEMETRY_SCHEMA_VERSION)
@@ -365,6 +492,7 @@ class CronoBusJsBridge(
                     .put("routeId", shift.routeId)
                     .put("occupancy", occupancyLevel.name)
                     .put("latestFix", fix.toJson())
+                    .put("photoAttached", photo != null)
                     .put("pendingSyncCount", syncManager.pendingCount.value)
                     .put("online", syncManager.isOnline.value)
                     .put("capturedAtUtcMs", nowUtcMs)
@@ -375,7 +503,7 @@ class CronoBusJsBridge(
                     shiftId = shift.shiftId,
                     unitId = shift.unitId,
                     reason = normalizedReason,
-                    photoEvidenceUri = null, // La cámara se conecta en la Fase 4.
+                    photoEvidenceUri = photo?.uri?.toString(),
                     attachedTelemetryJson = telemetry.toString(),
                     latitude = fix.position.latitude,
                     longitude = fix.position.longitude,
@@ -383,12 +511,14 @@ class CronoBusJsBridge(
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
                 )
                 val localId = disputeDao.insert(dispute)
+                SessionState.pendingPhoto = null
 
                 pushEvent(
                     "disputeFiled",
                     JSONObject()
                         .put("localId", localId)
                         .put("fineId", normalizedFineId)
+                        .put("photoAttached", photo != null)
                         .put("pendingSyncCount", syncManager.pendingCount.value),
                 )
             } catch (failure: Throwable) {
@@ -423,15 +553,182 @@ class CronoBusJsBridge(
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Evidencia fotográfica (FileProvider)
+    // ---------------------------------------------------------------------------------------------
+
+    @JavascriptInterface
+    fun captureDisputePhoto() = jsGuard("captureDisputePhoto") {
+        val requestCapture = onCapturePhotoRequested
+        if (requestCapture == null) {
+            pushError("captureDisputePhoto", "La cámara no está disponible en este contexto.")
+            return@jsGuard
+        }
+
+        try {
+            val photo = photoStore.createPhoto()
+            SessionState.pendingPhoto?.let(photoStore::delete)
+            SessionState.pendingPhoto = photo
+            mainHandler.post { requestCapture(photo.uri) }
+        } catch (failure: Throwable) {
+            Log.e(TAG, "No se pudo preparar el archivo de evidencia.", failure)
+            pushError("captureDisputePhoto", "No se pudo preparar la cámara.")
+        }
+    }
+
+    /** Invocado por MainActivity cuando la app de cámara termina. */
+    fun onPhotoCaptureResult(success: Boolean) {
+        val photo = SessionState.pendingPhoto
+        if (success && photo != null && photoStore.isUsable(photo)) {
+            pushEvent(
+                "photoCaptured",
+                JSONObject()
+                    .put("fileName", photo.file.name)
+                    .put("sizeBytes", photo.file.length()),
+            )
+            return
+        }
+
+        photo?.let(photoStore::delete)
+        SessionState.pendingPhoto = null
+        pushError(
+            "captureDisputePhoto",
+            if (success) {
+                "La cámara devolvió una imagen vacía. Intenta de nuevo."
+            } else {
+                "Captura cancelada."
+            },
+        )
+    }
+
+    /** Invocado por MainActivity si no hay app de cámara o el sistema rechaza el intento. */
+    fun onPhotoCaptureLaunchFailed(message: String = "No hay una app de cámara disponible.") {
+        SessionState.pendingPhoto?.let(photoStore::delete)
+        SessionState.pendingPhoto = null
+        pushError("captureDisputePhoto", message)
+    }
+
+    @JavascriptInterface
+    fun discardDisputePhoto() = jsGuard("discardDisputePhoto") {
+        SessionState.pendingPhoto?.let(photoStore::delete)
+        SessionState.pendingPhoto = null
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Pasajero (ETA) y despacho equitativo
+    // ---------------------------------------------------------------------------------------------
+
+    @JavascriptInterface
+    fun requestPassengerEta(routeId: String, stopId: String) = jsGuard("requestPassengerEta") {
+        val normalizedRoute = routeId.normalized(MAX_ROUTE_LENGTH)
+        val stop = RouteCatalog.findStop(normalizedRoute, stopId)
+        if (stop == null) {
+            pushPassengerEtaUnavailable("Ruta o parada sin catálogo operativo.")
+            return@jsGuard
+        }
+
+        val request = EtaRequest(routeId = normalizedRoute, stopId = stop.id)
+        SessionState.lastEtaRequest = request
+        SessionState.lastEtaRefreshMs = 0L
+        scope.launch {
+            buildAndPushEta(request, LocationTrackingService.latestUpdate.value)
+        }
+    }
+
+    @JavascriptInterface
+    fun requestDispatchQueue() = jsGuard("requestDispatchQueue") {
+        scope.launch { refreshDispatchQueue() }
+    }
+
+    @JavascriptInterface
+    fun dispatchNextUnit() = jsGuard("dispatchNextUnit") {
+        scope.launch {
+            var advanced: DispatchQueueSlot? = null
+            var queueSize = 0
+
+            SessionState.dispatchMutex.withLock {
+                var queue = SessionState.dispatchQueue
+                if (queue.isEmpty()) queue = buildDispatchQueue()
+                val next = dispatchUseCase.nextSlot(queue)
+                if (next == null) {
+                    SessionState.dispatchQueue = emptyList()
+                    return@withLock
+                }
+
+                val now = System.currentTimeMillis()
+                SessionState.lastDepartureByUnit[next.unitId] = now
+                SessionState.dispatchQueue = dispatchUseCase.rotateAfterDeparture(
+                    queue = queue,
+                    departingUnitId = next.unitId,
+                    nowUtcMs = now,
+                )
+                advanced = next
+                queueSize = SessionState.dispatchQueue.size
+            }
+
+            val dispatched = advanced
+            if (dispatched == null) {
+                pushError("dispatchNextUnit", "No hay unidades activas en la cola de despacho.")
+                return@launch
+            }
+
+            pushDispatchQueue()
+            pushEvent(
+                "dispatchAdvanced",
+                JSONObject()
+                    .put("unitId", dispatched.unitId)
+                    .put("queueSize", queueSize),
+            )
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Exportación financiera
+    // ---------------------------------------------------------------------------------------------
+
+    @JavascriptInterface
+    fun exportFinancialCsv() = jsGuard("exportFinancialCsv") {
+        scope.launch {
+            try {
+                val rows = buildFinancialCsvRows()
+                if (rows.isEmpty()) {
+                    pushError("exportFinancialCsv", "No hay turnos ni métricas para exportar.")
+                    return@launch
+                }
+
+                val export = csvExporter.export(rows)
+                pushEvent(
+                    "csvExported",
+                    JSONObject()
+                        .put("fileName", export.fileName)
+                        .put("rowCount", export.rowCount),
+                )
+                pushFinancialSummary()
+
+                val share = onCsvReadyForShare
+                if (share != null) {
+                    mainHandler.post { share(export.uri) }
+                }
+            } catch (failure: Throwable) {
+                Log.e(TAG, "No se pudo generar el CSV financiero.", failure)
+                pushError("exportFinancialCsv", "No se pudo generar el archivo CSV.")
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Kotlin → JS
     // ---------------------------------------------------------------------------------------------
 
     fun pushTelemetry(update: LocationUpdate) {
+        recordSpeedSample(update.speedMps)
+
         val payload = update.toJson()
         payload.put("shiftId", activeShift?.shiftId ?: JSONObject.NULL)
         payload.put("occupancy", occupancyLevel.name)
         payload.put("trackingActive", LocationTrackingService.isRunning.value)
         callJs("onTelemetry", payload)
+
+        refreshPassengerEtaIfDue(update)
     }
 
     fun pushGeofenceEvent(event: GeofenceEvent) {
@@ -449,6 +746,11 @@ class CronoBusJsBridge(
                 .put("dwellMillis", event.dwellMillis)
                 .put("shiftId", activeShift?.shiftId ?: JSONObject.NULL),
         )
+
+        // Solo la entrada al checador cuenta para el headway; la salida solo actualiza el mapa.
+        if (event.transition == GeofenceTransition.ENTER) {
+            scope.launch { recordCheckpoint(event) }
+        }
     }
 
     fun pushTamperAlert(event: TamperEvent) {
@@ -480,6 +782,364 @@ class CronoBusJsBridge(
                 .put("syncing", syncing),
         )
     }
+
+    private fun pushHeadwayAssessment(assessment: HeadwayAssessment, unitId: String) {
+        callJs(
+            "onHeadway",
+            JSONObject()
+                .put("unitId", unitId)
+                .put("checkpointId", assessment.checkpointId)
+                .put("checkpointName", assessment.checkpointName)
+                .put("targetHeadwaySeconds", assessment.targetHeadwaySeconds)
+                .put("actualHeadwaySeconds", assessment.actualHeadwaySeconds)
+                .put("deltaSeconds", assessment.deltaSeconds)
+                .put("status", assessment.status.name)
+                .put("suggestedFineAmountMxn", assessment.suggestedFineAmountMxn)
+                .putOpt("forceMajeureExempt", assessment.forceMajeureResult?.isExempt)
+                .putOpt("forceMajeureSummary", assessment.forceMajeureResult?.reasonSummary),
+        )
+    }
+
+    private fun pushForceMajeure(result: ForceMajeureResult) {
+        val matchingIds = JSONArray()
+        result.matchingReportIds.forEach { matchingIds.put(it) }
+
+        callJs(
+            "onForceMajeure",
+            JSONObject()
+                .put("isExempt", result.isExempt)
+                .put("qualifyingUnitsCount", result.qualifyingUnitsCount)
+                .put("minimumDistinctUnits", forceMajeureUseCase.minimumDistinctUnits)
+                .put("radiusMeters", result.radiusMeters)
+                .put("windowMinutes", result.windowMinutes)
+                .put("matchingReportIds", matchingIds)
+                .put("reasonSummary", result.reasonSummary),
+        )
+    }
+
+    private fun pushDispatchQueue() {
+        val queue = SessionState.dispatchQueue
+        val slots = JSONArray()
+        queue.sortedBy { it.position }.forEach { slot ->
+            slots.put(
+                JSONObject()
+                    .put("position", slot.position)
+                    .put("unitId", slot.unitId)
+                    .put("driverAlias", slot.driverAlias)
+                    .put("routeId", slot.routeId)
+                    .put("scheduledDepartureEpochMs", slot.scheduledDepartureEpochMs)
+                    .put("accumulatedFineMxn", round2(slot.accumulatedFineMxn))
+                    .put("bonusEligible", slot.bonusEligible)
+                    .put("bonusMxn", round2(dispatchUseCase.bonusFor(slot)))
+                    .put("forceMajeureExemptionsCount", slot.forceMajeureExemptionsCount),
+            )
+        }
+
+        callJs(
+            "onDispatchQueue",
+            JSONObject()
+                .put("slots", slots)
+                .putOpt("nextUnitId", dispatchUseCase.nextSlot(queue)?.unitId),
+        )
+    }
+
+    private fun pushPassengerEta(quote: PassengerEtaQuote) {
+        callJs(
+            "onPassengerEta",
+            JSONObject()
+                .put("routeId", quote.routeId)
+                .put("stopId", quote.stopId)
+                .put("stopName", quote.stopName)
+                .put("nearestUnitId", quote.nearestUnitId)
+                .put("distanceMeters", round2(quote.distanceMeters))
+                .put("filteredSpeedMps", round2(quote.filteredSpeedMps))
+                .put("filteredSpeedKmh", round2(quote.filteredSpeedMps * 3.6))
+                .put("activeIncidentsCount", quote.activeIncidentsCount)
+                .put("incidentDelayMinutes", etaUseCase.incidentDelayMinutes(quote.activeIncidentsCount))
+                .put("etaMinutes", quote.etaMinutes)
+                .put("occupancyLevel", quote.occupancyLevel)
+                .put("isStaleCache", quote.isStaleCache)
+                .put("calculatedAtEpochMs", quote.calculatedAtEpochMs),
+        )
+    }
+
+    private fun pushPassengerEtaUnavailable(message: String) {
+        callJs("onPassengerEtaUnavailable", JSONObject().put("message", message))
+    }
+
+    private suspend fun pushFinancialSummary() {
+        val shifts = runCatching { shiftDao.getRecentShifts(FINANCIAL_SHIFT_LIMIT) }
+            .getOrDefault(emptyList())
+        val units = LinkedHashMap<String, String>()
+        shifts.forEach { units.putIfAbsent(it.unitId, it.routeId) }
+        SessionState.ledger.forEach { (unitId, state) -> units.putIfAbsent(unitId, state.routeId) }
+
+        var saasTotal = 0.0
+        var grossFines = 0.0
+        var forgiven = 0.0
+        var bonuses = 0.0
+
+        units.forEach { (unitId, _) ->
+            val state = SessionState.ledger[unitId]
+            saasTotal += SAAS_FEE_PER_UNIT_MXN
+            if (state != null) {
+                grossFines += state.grossFinesMxn
+                forgiven += state.forgivenFinesMxn
+                if (state.assessments > 0 && state.netFinesMxn <= 0.0) {
+                    bonuses += dispatchUseCase.punctualityBonusMxn
+                }
+            }
+        }
+
+        callJs(
+            "onFinancialSummary",
+            JSONObject()
+                .put("activeUnits", shifts.count { it.endTimestampUtcMs == null })
+                .put("fleetSize", DEFAULT_FLEET_SIZE)
+                .put("unitCount", units.size)
+                .put("saasTotalMxn", round2(saasTotal))
+                .put("grossFinesMxn", round2(grossFines))
+                .put("forgivenMxn", round2(forgiven))
+                .put("netFinesMxn", round2((grossFines - forgiven).coerceAtLeast(0.0)))
+                .put("bonusTotalMxn", round2(bonuses)),
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Persistencia del checador, headway y métricas
+    // ---------------------------------------------------------------------------------------------
+
+    private suspend fun recordCheckpoint(event: GeofenceEvent) {
+        val shift = currentShiftOrLoad() ?: return
+        val observedAtUtcMs = System.currentTimeMillis()
+        val forceMajeure = forceMajeureUseCase.evaluate(
+            routeId = shift.routeId,
+            position = event.position,
+            referenceTimeUtcMs = observedAtUtcMs,
+        )
+        val assessment = headwayUseCase.assessCrossing(
+            checkpointId = event.zoneId,
+            checkpointName = event.zoneName,
+            routeId = shift.routeId,
+            unitId = shift.unitId,
+            observedAtUtcMs = observedAtUtcMs,
+            forceMajeure = forceMajeure,
+        )
+        val fix = LocationTrackingService.latestUpdate.value
+
+        try {
+            checkpointDao.insert(
+                CheckpointEventEntity(
+                    shiftId = shift.shiftId,
+                    unitId = shift.unitId,
+                    routeId = shift.routeId,
+                    checkpointId = event.zoneId,
+                    checkpointName = event.zoneName,
+                    eventType = event.transition.name,
+                    latitude = event.position.latitude,
+                    longitude = event.position.longitude,
+                    filteredSpeedMps = fix?.speedMps ?: 0.0,
+                    headwayDeltaSeconds = assessment?.deltaSeconds ?: 0L,
+                    occupancyLevel = occupancyLevel,
+                    timestampUtcMs = observedAtUtcMs,
+                    elapsedRealtimeNanos = event.occurredAtMonotonicNanos,
+                ),
+            )
+        } catch (failure: Throwable) {
+            Log.e(TAG, "No se pudo persistir el cruce de ${event.zoneName}.", failure)
+            pushError("geofence", "No se pudo guardar el cruce del checador.")
+        }
+
+        if (assessment != null) {
+            updateFinancialLedger(shift.unitId, shift.routeId, assessment)
+            pushHeadwayAssessment(assessment, shift.unitId)
+        }
+        pushForceMajeure(forceMajeure)
+        pushFinancialSummary()
+        refreshPassengerEtaIfRequested()
+    }
+
+    private suspend fun updateFinancialLedger(
+        unitId: String,
+        routeId: String,
+        assessment: HeadwayAssessment,
+    ) {
+        val theoreticalFine = when (assessment.status) {
+            HeadwayStatus.LATE_FINE -> assessment.suggestedFineAmountMxn
+            HeadwayStatus.EXEMPT_FORCE_MAJEURE -> headwayUseCase.fineForDelta(assessment.deltaSeconds)
+            else -> 0.0
+        }
+        val forgiven = if (assessment.status == HeadwayStatus.EXEMPT_FORCE_MAJEURE) {
+            theoreticalFine
+        } else {
+            0.0
+        }
+
+        val updated = SessionState.ledger.compute(unitId) { _, previous ->
+            val base = previous ?: UnitFinancialState(routeId = routeId)
+            base.copy(
+                routeId = routeId,
+                grossFinesMxn = base.grossFinesMxn + theoreticalFine,
+                forgivenFinesMxn = base.forgivenFinesMxn + forgiven,
+                assessments = base.assessments + 1,
+                exemptions = base.exemptions + if (forgiven > 0.0) 1 else 0,
+            )
+        } ?: return
+
+        SessionState.dispatchMutex.withLock {
+            SessionState.dispatchQueue = dispatchUseCase.updateMetrics(
+                queue = SessionState.dispatchQueue,
+                unitId = unitId,
+                accumulatedFineMxn = updated.netFinesMxn,
+                forceMajeureExemptionsCount = updated.exemptions,
+            )
+        }
+        pushDispatchQueue()
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Despacho equitativo
+    // ---------------------------------------------------------------------------------------------
+
+    private suspend fun buildDispatchQueue(): List<DispatchQueueSlot> {
+        val shifts = runCatching { shiftDao.getActiveShifts() }.getOrDefault(emptyList())
+        val nowUtcMs = System.currentTimeMillis()
+
+        val candidates = shifts.map { shift ->
+            SessionState.lastDepartureByUnit.putIfAbsent(
+                shift.unitId,
+                shift.startTimestampUtcMs,
+            )
+            val ledger = SessionState.ledger[shift.unitId]
+            DispatchCandidate(
+                unitId = shift.unitId,
+                driverAlias = shift.driverAlias,
+                routeId = shift.routeId,
+                lastDepartureEpochMs = SessionState.lastDepartureByUnit[shift.unitId],
+                accumulatedFineMxn = ledger?.netFinesMxn ?: 0.0,
+                forceMajeureExemptionsCount = ledger?.exemptions ?: 0,
+            )
+        }
+
+        return dispatchUseCase.buildQueue(candidates, nowUtcMs)
+    }
+
+    private suspend fun refreshDispatchQueue() {
+        SessionState.dispatchMutex.withLock {
+            SessionState.dispatchQueue = buildDispatchQueue()
+        }
+        pushDispatchQueue()
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Finanzas y ETA
+    // ---------------------------------------------------------------------------------------------
+
+    private suspend fun buildFinancialCsvRows(): List<FinancialCsvRow> {
+        val shifts = runCatching { shiftDao.getRecentShifts(FINANCIAL_SHIFT_LIMIT) }
+            .getOrDefault(emptyList())
+        val units = LinkedHashMap<String, String>()
+        shifts.forEach { units.putIfAbsent(it.unitId, it.routeId) }
+        SessionState.ledger.forEach { (unitId, state) -> units.putIfAbsent(unitId, state.routeId) }
+
+        return units.map { (unitId, routeId) ->
+            val state = SessionState.ledger[unitId]
+            val gross = state?.grossFinesMxn ?: 0.0
+            val forgiven = state?.forgivenFinesMxn ?: 0.0
+            val net = (gross - forgiven).coerceAtLeast(0.0)
+            val bonus = if (state != null && state.assessments > 0 && net <= 0.0) {
+                dispatchUseCase.punctualityBonusMxn
+            } else {
+                0.0
+            }
+
+            FinancialCsvRow(
+                unitId = unitId,
+                routeId = routeId,
+                saasFeeMxn = SAAS_FEE_PER_UNIT_MXN,
+                grossFinesMxn = round2(gross),
+                forceMajeureForgivenMxn = round2(forgiven),
+                netFinesMxn = round2(net),
+                punctualityBonusMxn = round2(bonus),
+            )
+        }.sortedBy { it.unitId }
+    }
+
+    private suspend fun buildAndPushEta(request: EtaRequest, update: LocationUpdate?) {
+        val stop = RouteCatalog.findStop(request.routeId, request.stopId)
+        if (stop == null) {
+            pushPassengerEtaUnavailable("La ruta o parada no tiene coordenadas configuradas.")
+            return
+        }
+        if (update == null || !update.position.isValid || update.isMock) {
+            pushPassengerEtaUnavailable("Sin telemetría GPS válida para calcular el ETA.")
+            return
+        }
+
+        val ageNanos = SystemClock.elapsedRealtimeNanos() - update.elapsedRealtimeNanos
+        if (ageNanos !in 0L..MAX_FIX_AGE_NANOS) {
+            pushPassengerEtaUnavailable("La última posición GPS está desactualizada.")
+            return
+        }
+
+        val nowUtcMs = System.currentTimeMillis()
+        val since = nowUtcMs - ETA_INCIDENT_WINDOW_MINUTES * 60_000L
+        val incidents = runCatching {
+            incidenceDao.countRecentRouteIncidents(request.routeId, since)
+        }.getOrDefault(0)
+
+        pushPassengerEta(
+            etaUseCase.calculate(
+                routeId = request.routeId,
+                stopId = stop.id,
+                stopName = stop.name,
+                unitId = activeShift?.unitId ?: DEFAULT_UNIT_ID,
+                unitPosition = update.position,
+                stopPosition = stop.position,
+                averageSpeedMps = averageFilteredSpeed(update.speedMps),
+                activeIncidentsCount = incidents,
+                occupancyLevel = occupancyLevel.name,
+                calculatedAtEpochMs = nowUtcMs,
+            ),
+        )
+    }
+
+    private fun refreshPassengerEtaIfDue(update: LocationUpdate) {
+        val request = SessionState.lastEtaRequest ?: return
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (nowElapsed - SessionState.lastEtaRefreshMs < ETA_REFRESH_INTERVAL_MS) return
+
+        SessionState.lastEtaRefreshMs = nowElapsed
+        scope.launch { buildAndPushEta(request, update) }
+    }
+
+    private fun refreshPassengerEtaIfRequested() {
+        val request = SessionState.lastEtaRequest ?: return
+        SessionState.lastEtaRefreshMs = 0L
+        scope.launch {
+            buildAndPushEta(request, LocationTrackingService.latestUpdate.value)
+        }
+    }
+
+    private fun recordSpeedSample(speedMps: Double) {
+        if (!speedMps.isFinite() || speedMps < 0.0) return
+        synchronized(SessionState.speedSamples) {
+            SessionState.speedSamples.addLast(speedMps)
+            while (SessionState.speedSamples.size > MAX_SPEED_SAMPLES) {
+                SessionState.speedSamples.removeFirst()
+            }
+        }
+    }
+
+    private fun averageFilteredSpeed(fallback: Double): Double {
+        val samples = synchronized(SessionState.speedSamples) {
+            SessionState.speedSamples.filter { it.isFinite() && it >= 0.0 }
+        }
+        return if (samples.isEmpty()) fallback else samples.average()
+    }
+
+    private fun round2(value: Double): Double =
+        kotlin.math.round(value * 100.0) / 100.0
 
     // ---------------------------------------------------------------------------------------------
     // Internos
@@ -645,6 +1305,15 @@ class CronoBusJsBridge(
 
         private const val TELEMETRY_SCHEMA_VERSION = 1
         private const val MAX_FIX_AGE_NANOS = 60_000L * 1_000_000L
+
+        private const val MAX_SPEED_SAMPLES = 12
+        private const val ETA_REFRESH_INTERVAL_MS = 10_000L
+        private const val ETA_INCIDENT_WINDOW_MINUTES = 15L
+
+        private const val FINANCIAL_SHIFT_LIMIT = 50
+        private const val SAAS_FEE_PER_UNIT_MXN = 750.0
+        private const val DEFAULT_FLEET_SIZE = 8
+        private const val DEFAULT_UNIT_ID = "14"
 
         private const val MAX_ALIAS_LENGTH = 64
         private const val MAX_UNIT_LENGTH = 32

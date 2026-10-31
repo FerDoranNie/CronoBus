@@ -26,7 +26,7 @@ flowchart LR
    - Abre y cierra cada Sprint actualizando [`to_do.md`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/to_do.md).
    - Entrega al humano el prompt exacto para copiar/ejecutar en el siguiente turno y audita que se respete la proporción **75% DeepSeek / 25% Gemini 3.8 Flash**.
    - Ejecuta la batería de validación final al cierre de cada Sprint (`./gradlew testDebugUnitTest`, `./gradlew assembleDebug`, pruebas Roborazzi y verificación de las 3 vistas).
-   - Entrega al final un bloque con el **comando `git commit` propuesto listo para copiar y pegar**.
+   - Entrega al final un bloque con el **comando `git commit` propuesto en español, listo para copiar y pegar**.
 2. **Gemini 3.8 Flash (Escritor Secundario — 25% del trabajo de escritura):**
    - Entra primero en cada Sprint para preparar el terreno rápido: manifiestos, `build.gradle.kts`, recursos XML, temas Compose (`Color.kt`, `Theme.kt`, `Type.kt`), CSS offline local en `assets/`, DTOs/Entities base y modales HTML de apoyo.
 3. **DeepSeek (Escritor Principal — 75% del trabajo de escritura):**
@@ -63,4 +63,4 @@ Al finalizar su turno, cada agente debe imprimir al final de su respuesta un blo
 2. **Archivos Creados / Modificados:** Lista con rutas exactas.
 3. **Contratos / Estado para el Siguiente Agente:** Qué quedó listo y qué debe revisar o conectar el siguiente modelo en la fila.
 4. **Instrucción para el Humano:** Qué modelo seleccionar a continuación y qué prompt pegarle.
-5. **Commit Propuesto (Listo para Copiar y Pegar):** Bloque de código con el comando `git add` + `git commit -m "..."` (siguiendo Conventional Commits) para respaldar el avance del paso o cierre de Sprint.
+5. **Commit Propuesto (Listo para Copiar y Pegar):** Bloque de código con el comando `git add` + `git commit -m "..."` **obligatoriamente en español** (siguiendo Conventional Commits, ej. `feat(dominio): agregar evaluación de fuerza mayor`) para respaldar el avance del paso o cierre de Sprint.

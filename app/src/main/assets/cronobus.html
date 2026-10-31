@@ -296,8 +296,8 @@
           <div class='status-card-green'>
             <span class='text-[10px] font-bold uppercase text-[#177251]'>Headway (Intervalo)</span>
             <div class='flex flex-col'>
-              <span id="driver-headway" class='text-2xl font-mono font-black text-[#0b6c4b]'>-02:30 min</span>
-              <span class='text-[10px] font-medium text-[#177251]'>Distancia Óptima</span>
+              <span id="driver-headway" class='text-2xl font-mono font-black text-[#0b6c4b]'>--:--</span>
+              <span id="headway-status-label" class='text-[10px] font-medium text-[#177251]'>Sin referencia GPS</span>
             </div>
           </div>
           <div class='status-card-amber'>
@@ -313,39 +313,39 @@
         <div class='info-card'>
           <div class='px-3 py-2 bg-[#eeeeee] border-b border-[#c4c7c7] flex justify-between items-center'>
             <span class='text-[11px] font-bold uppercase text-[#444748]'>Checador Digital</span>
-            <span class='text-[10px] font-mono text-[#444748]'>Progreso: 2/4</span>
+            <span id="checkpoint-progress" class='text-[10px] font-mono text-[#444748]'>Progreso: 0/4</span>
           </div>
           <div class='px-3 py-2 space-y-1'>
-            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee] opacity-40'>
-              <div class='w-5 h-5 rounded-sm bg-[#0b6c4b] flex items-center justify-center text-white text-[10px]'>✓</div>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee]' data-checkpoint-name='Base A - Sevilla'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7] flex items-center justify-center text-white text-[10px]' data-checkpoint-icon></div>
               <div class='flex-1'>
                 <div class='text-xs font-bold text-[#1a1c1c]'>Base A - Sevilla</div>
               </div>
-              <div class='text-[10px] font-bold text-[#0b6c4b]'>OK</div>
+              <div class='text-[10px] font-bold text-[#444748]' data-checkpoint-status>--:--</div>
             </div>
-            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee] bg-green-50/50 -mx-3 px-3'>
-              <div class='w-5 h-5 rounded-sm border-2 border-[#0b6c4b] flex items-center justify-center text-[#0b6c4b] animate-pulse'>
-                <div class='w-2 h-2 bg-[#0b6c4b] rounded-full'></div>
-              </div>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee]' data-checkpoint-name='Estación Diana'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7] flex items-center justify-center text-white text-[10px]' data-checkpoint-icon></div>
               <div class='flex-1'>
                 <div class='text-xs font-bold text-[#1a1c1c]'>Estación Diana</div>
-                <div class='text-[10px] text-[#444748]'>EN RANGO...</div>
+                <div class='text-[10px] text-[#444748]' data-checkpoint-hint>Sin registrar</div>
               </div>
-              <div class='text-[10px] font-bold text-[#0b6c4b]'>A TIEMPO</div>
+              <div class='text-[10px] font-bold text-[#444748]' data-checkpoint-status>--:--</div>
             </div>
-            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee]'>
-              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7]'></div>
+            <div class='flex items-center gap-3 py-2 border-b border-[#eeeeee]' data-checkpoint-name='Hospital Gral.'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7] flex items-center justify-center text-white text-[10px]' data-checkpoint-icon></div>
               <div class='flex-1'>
                 <div class='text-xs font-bold text-[#1a1c1c]'>Hospital Gral.</div>
+                <div class='text-[10px] text-[#444748]' data-checkpoint-hint>Sin registrar</div>
               </div>
-              <div class='text-[10px] font-bold text-[#444748]'>--:--</div>
+              <div class='text-[10px] font-bold text-[#444748]' data-checkpoint-status>--:--</div>
             </div>
-            <div class='flex items-center gap-3 py-2'>
-              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7]'></div>
+            <div class='flex items-center gap-3 py-2' data-checkpoint-name='Terminal Centro'>
+              <div class='w-5 h-5 rounded-sm border-2 border-[#c4c7c7] flex items-center justify-center text-white text-[10px]' data-checkpoint-icon></div>
               <div class='flex-1'>
                 <div class='text-xs font-bold text-[#1a1c1c]'>Terminal Centro</div>
+                <div class='text-[10px] text-[#444748]' data-checkpoint-hint>Sin registrar</div>
               </div>
-              <div class='text-[10px] font-bold text-[#444748]'>--:--</div>
+              <div class='text-[10px] font-bold text-[#444748]' data-checkpoint-status>--:--</div>
             </div>
           </div>
         </div>
@@ -400,32 +400,44 @@
         <div id="force-majeure-banner" class="flex items-center justify-between p-2.5 bg-[#a0f4ca] text-[#0b6c4b] border border-[#0b6c4b] rounded" style="border: 1px solid #0b6c4b; background-color: #a0f4ca; color: #0b6c4b; box-shadow: 2px 2px 0px rgba(10,10,10,0.1);">
           <div class="flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-[#0b6c4b] animate-pulse inline-block"></span>
-            <span class="text-[11px] font-bold uppercase">Fuerza Mayor (3 unid / 500m / 15m)</span>
+            <span id="force-majeure-status-text" class="text-[11px] font-bold uppercase">Monitoreo FM · 0/3</span>
           </div>
-          <span class="text-[10px] font-mono font-bold bg-[#0b6c4b] text-white px-1.5 py-0.5 rounded">EXENCIÓN AUTO</span>
+          <span id="force-majeure-status-badge" class="text-[10px] font-mono font-bold bg-[#0b6c4b] text-white px-1.5 py-0.5 rounded">SIN EXENCIÓN</span>
         </div>
 
         <!-- Metrics SaaS -->
         <div class="grid grid-cols-2 gap-2">
           <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
             <span class="text-[10px] font-bold text-[#444748] uppercase">Unidades Activas</span>
-            <span class="text-xl font-bold font-mono text-[#1a1c1c]">5 / 8</span>
+            <span id="metric-active-units" class="text-xl font-bold font-mono text-[#1a1c1c]">0 / 8</span>
           </div>
           <div class="bg-[#eeeeee] border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
             <span class="text-[10px] font-bold text-[#444748] uppercase">SaaS Mensual</span>
-            <span class="text-xl font-bold font-mono text-[#0b6c4b]">$750</span>
+            <span id="metric-saas" class="text-xl font-bold font-mono text-[#0b6c4b]">$0</span>
           </div>
           <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col justify-between">
             <span class="text-[10px] font-bold text-[#444748] uppercase">Bonos (OPEX)</span>
-            <span class="text-xl font-bold font-mono text-[#0b6c4b]">$120</span>
+            <span id="metric-bonuses" class="text-xl font-bold font-mono text-[#0b6c4b]">$0</span>
           </div>
           <div class="bg-[#ffdad6] border border-[#ba1a1a] rounded-lg p-3 flex flex-col justify-between">
             <span class="text-[10px] font-bold text-[#93000a] uppercase">Multas Cobradas</span>
-            <span class="text-xl font-bold font-mono text-[#93000a]">$50</span>
+            <span id="metric-fines" class="text-xl font-bold font-mono text-[#93000a]">$0</span>
           </div>
         </div>
 
         <button id="btn-export-financial-csv" class="bg-[#eeeeee] border border-[#c4c7c7] rounded-md py-2 w-full text-xs font-bold active:bg-[#0a0a0a] active:text-white transition-colors" onclick="exportData()">⬇ Exportar Resumen CSV</button>
+
+        <!-- Cola Rotativa de Salidas (FairDispatchRotationUseCase) -->
+        <div class="bg-white border border-[#c4c7c7] rounded-lg p-3 flex flex-col gap-2" style="border: 1px solid #c4c7c7; box-shadow: 4px 4px 0px rgba(10,10,10,0.1); background-color: #ffffff;">
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] font-bold uppercase text-[#444748]">Cola Rotativa de Salidas</span>
+            <button type="button" onclick="dispatchNextUnit()" class="text-[9px] font-bold bg-[#0b6c4b] text-white border border-[#0b6c4b] px-2 py-1 rounded active:opacity-80" style="border: 1px solid #0b6c4b; background-color: #0b6c4b; color: #ffffff; cursor: pointer;">▶ Despachar</button>
+          </div>
+          <ul id="dispatch-queue-list" class="flex flex-col gap-1.5 text-[11px]">
+            <li class="text-[#444748] italic">Sin unidades activas.</li>
+          </ul>
+          <span class="text-[9px] text-[#444748]">La rotación prioriza a la unidad que salió hace más tiempo.</span>
+        </div>
 
         <hr class="border-[#c4c7c7] my-1">
         
@@ -462,14 +474,15 @@
       <div class="absolute top-4 left-4 right-4 md:w-80 z-[1000]">
         <div class="bg-white border border-[#c4c7c7] rounded-lg p-4">
           <label class="block text-[10px] font-bold text-[#444748] mb-1 uppercase">Selecciona Ruta</label>
-          <select class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold mb-3 focus:outline-none focus:border-[#0b6c4b]">
-            <option>Ruta 42 - Centro/Diana</option>
-            <option>Ruta 15 - Universidad</option>
+          <select id="passenger-route-select" onchange="requestPassengerEta()" class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold mb-3 focus:outline-none focus:border-[#0b6c4b]">
+            <option value="Ruta 42 - Centro/Diana">Ruta 42 - Centro/Diana</option>
           </select>
           <label class="block text-[10px] font-bold text-[#444748] mb-1 uppercase">Tu Parada</label>
-          <select class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold focus:outline-none focus:border-[#0b6c4b]">
-            <option>Estación Diana</option>
-            <option>Hospital Gral.</option>
+          <select id="passenger-stop-select" onchange="requestPassengerEta()" class="w-full p-2 border border-[#c4c7c7] rounded bg-[#f9f9f9] text-xs font-bold focus:outline-none focus:border-[#0b6c4b]">
+            <option value="sevilla">Base A - Sevilla</option>
+            <option value="diana" selected>Estación Diana</option>
+            <option value="hospital">Hospital Gral.</option>
+            <option value="terminal">Terminal Centro</option>
           </select>
         </div>
       </div>
@@ -477,13 +490,14 @@
       <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-[1000]">
         <div class="bg-white border border-[#c4c7c7] border-l-4 border-l-[#0b6c4b] rounded-lg p-3 flex gap-3 items-center">
           <div class="w-12 h-12 bg-[#a0f4ca] text-[#0b6c4b] border border-[#0b6c4b] rounded flex flex-col items-center justify-center font-bold shrink-0">
-            <span class="text-xl font-mono leading-none" id="eta-mins">4</span>
+            <span class="text-xl font-mono leading-none" id="eta-mins">—</span>
             <span class="text-[9px] uppercase">Min</span>
           </div>
           <div class="flex-1">
-            <p class="text-sm font-bold text-[#1a1c1c] leading-tight">Unidad #14 en camino</p>
-            <p class="text-[10px] font-medium text-[#444748] mb-1">Llega a Estación Diana</p>
-            <div class="inline-block bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase">Asientos Disponibles</div>
+            <p id="eta-unit-name" class="text-sm font-bold text-[#1a1c1c] leading-tight">Unidad en camino</p>
+            <p id="eta-stop-name" class="text-[10px] font-medium text-[#444748] mb-1">Llega a Estación Diana</p>
+            <div id="eta-occupancy-badge" class="inline-block bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase">Aforo no reportado</div>
+            <p id="eta-context" class="text-[9px] text-[#444748] mt-1">Sin telemetría nativa.</p>
           </div>
         </div>
       </div>
@@ -689,6 +703,13 @@
     let publicMarkers = {};
 
     function initMaps() {
+      // Regla offline-first: sin Leaflet (CDN no empaquetado aún, tarea 1.3) la app debe seguir
+      // funcionando. El checador, el headway, el ETA y el CSV son nativos y no dependen del mapa.
+      if (typeof L === 'undefined') {
+        console.warn('Leaflet no disponible sin conexión; mapas deshabilitados.');
+        return;
+      }
+
       // Admin Map
       mapAdmin = L.map('map-admin', { zoomControl: false }).setView([19.4245, -99.1750], 15);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapAdmin);
@@ -769,8 +790,14 @@
       
       // Leaflet needs resize fix when container becomes visible
       setTimeout(() => {
-        if(tabId === 'admin') mapAdmin.invalidateSize();
-        if(tabId === 'passenger') mapPublic.invalidateSize();
+        if(tabId === 'admin') {
+          if (mapAdmin) mapAdmin.invalidateSize();
+          requestDispatchQueue();
+        }
+        if(tabId === 'passenger') {
+          if (mapPublic) mapPublic.invalidateSize();
+          requestPassengerEta();
+        }
       }, 100);
     }
 
@@ -802,23 +829,30 @@
 
       // Update positions
       units.forEach(u => {
-        if(u.status !== 'blocked') {
-          // base speed: traverse route in ~60 seconds at 1x
-          let speedFactor = 1 / 60; 
-          u.progress += speedFactor * dt * state.speed * u.speedMult;
-          if(u.progress > 1) u.progress = 0; // loop
+        // La unidad 14 es la del conductor: cuando hay telemetría nativa, el GPS real manda
+        // sobre el simulador. Las demás unidades siguen siendo demostrativas.
+        const isNativeUnit = window.__cronobusNativeActive === true && u.id === 14;
+        if (!isNativeUnit) {
+          if(u.status !== 'blocked') {
+            // base speed: traverse route in ~60 seconds at 1x
+            let speedFactor = 1 / 60;
+            u.progress += speedFactor * dt * state.speed * u.speedMult;
+            if(u.progress > 1) u.progress = 0; // loop
+          }
+
+          let pos = getInterpolatedPosition(u.progress);
+          u.lat = pos.lat;
+          u.lng = pos.lng;
         }
-        
-        let pos = getInterpolatedPosition(u.progress);
-        u.lat = pos.lat;
-        u.lng = pos.lng;
       });
 
-      // Simple ETA update for Unit 14
-      let u14 = units.find(u => u.id === 14);
-      let distRemaining = 1.0 - u14.progress;
-      let etaMins = Math.max(1, Math.floor(distRemaining * 10 / state.speed));
-      document.getElementById('eta-mins').innerText = etaMins;
+      // Simple ETA update for Unit 14 (solo si no hay una cotización nativa del pasajero)
+      if (window.__cronobusNativeActive !== true) {
+        let u14 = units.find(u => u.id === 14);
+        let distRemaining = 1.0 - u14.progress;
+        let etaMins = Math.max(1, Math.floor(distRemaining * 10 / state.speed));
+        document.getElementById('eta-mins').innerText = etaMins;
+      }
 
       updateMarkers();
       requestAnimationFrame(tick);
@@ -902,9 +936,22 @@
       if (modal) modal.style.display = 'flex';
     }
 
-    function closeDisputeModal() {
+    function closeDisputeModal(discardPhoto = true) {
       const modal = document.getElementById('modal-dispute-fine');
       if (modal) modal.style.display = 'none';
+
+      // Al cancelar se libera la captura huérfana. Al enviar (discardPhoto=false) el nativo
+      // conserva el archivo hasta que la apelación queda persistida.
+      if (discardPhoto) {
+        if (window.CronoBusNative && typeof window.CronoBusNative.discardDisputePhoto === 'function') {
+          window.CronoBusNative.discardDisputePhoto();
+        }
+        const statusSpan = document.getElementById('photo-evidence-status');
+        if (statusSpan) {
+          statusSpan.innerText = 'Sin foto adjunta';
+          statusSpan.style.color = '#444748';
+        }
+      }
     }
 
     function disputeFine() {
@@ -928,7 +975,7 @@
       const reason = document.getElementById('dispute-reason')?.value || 'Apelación con telemetría GPS y reporte de bloqueo en el tramo.';
       if (window.CronoBusNative && typeof window.CronoBusNative.disputeFine === 'function') {
         window.CronoBusNative.disputeFine(fineId, reason);
-        closeDisputeModal();
+        closeDisputeModal(false);
         return;
       }
       alert(`Apelación registrada para sanción ${fineId}:\n"${reason}"\nEvidencia fotográfica vinculada.`);
@@ -952,7 +999,259 @@
     }
 
     function exportData() {
+      if (window.CronoBusNative && typeof window.CronoBusNative.exportFinancialCsv === 'function') {
+        window.CronoBusNative.exportFinancialCsv();
+        return;
+      }
       alert("Generando CSV...\nUnidades: 8\nRecaudación SaaS: $1,200\nMultas Inyectadas: $50\nBonos Pagados: $120");
+    }
+
+    // ============================================================
+    // RENDERIZADO DE ESTADO NATIVO (3 vistas)
+    // ============================================================
+    function addAdminAlert(title, message, accent = '#ffba38') {
+      const container = document.getElementById('admin-alerts-container');
+      if (!container) return;
+
+      const card = document.createElement('div');
+      card.className = 'bg-white border border-[#c4c7c7] rounded-md p-3';
+      card.style.borderLeft = `4px solid ${accent}`;
+
+      const header = document.createElement('div');
+      header.className = 'flex justify-between items-start mb-1';
+      const titleEl = document.createElement('span');
+      titleEl.className = 'text-xs font-bold';
+      titleEl.style.color = accent;
+      titleEl.textContent = title;
+      const timeEl = document.createElement('span');
+      timeEl.className = 'text-[10px] text-[#444748] font-mono';
+      timeEl.textContent = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      header.appendChild(titleEl);
+      header.appendChild(timeEl);
+
+      const body = document.createElement('p');
+      body.className = 'text-xs text-[#1a1c1c]';
+      body.textContent = message;
+
+      card.appendChild(header);
+      card.appendChild(body);
+      container.insertBefore(card, container.firstChild);
+
+      while (container.children.length > 12) {
+        container.removeChild(container.lastElementChild);
+      }
+
+      const counter = document.getElementById('alert-counter');
+      const count = container.children.length;
+      if (counter) counter.innerText = `${count} Alerta${count === 1 ? '' : 's'}`;
+    }
+
+    function formatHeadwayClock(deltaSeconds) {
+      const delta = Number(deltaSeconds) || 0;
+      const absolute = Math.abs(delta);
+      const minutes = Math.floor(absolute / 60);
+      const seconds = Math.floor(absolute % 60);
+      const sign = delta >= 0 ? '+' : '-';
+      return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function renderHeadway(payload) {
+      const valueEl = document.getElementById('driver-headway');
+      const labelEl = document.getElementById('headway-status-label');
+
+      if (valueEl) {
+        valueEl.innerText = `${formatHeadwayClock(payload.deltaSeconds)} min`;
+        const colors = {
+          ON_TIME: '#0b6c4b',
+          WARNING: '#b57e00',
+          LATE_FINE: '#ba1a1a',
+          EXEMPT_FORCE_MAJEURE: '#0b6c4b'
+        };
+        valueEl.style.color = colors[payload.status] || '#0b6c4b';
+      }
+
+      if (labelEl) {
+        const labels = {
+          ON_TIME: 'A TIEMPO',
+          WARNING: 'FUERA DE VENTANA',
+          LATE_FINE: 'RETRASO · SANCIÓN',
+          EXEMPT_FORCE_MAJEURE: 'EXENTO FUERZA MAYOR'
+        };
+        let label = labels[payload.status] || 'SIN REFERENCIA';
+        if (payload.status === 'LATE_FINE' && Number(payload.suggestedFineAmountMxn) > 0) {
+          label += ` $${Number(payload.suggestedFineAmountMxn).toFixed(0)}`;
+        }
+        labelEl.innerText = label;
+        const labelColors = {
+          ON_TIME: '#177251',
+          WARNING: '#b57e00',
+          LATE_FINE: '#93000a',
+          EXEMPT_FORCE_MAJEURE: '#0b6c4b'
+        };
+        labelEl.style.color = labelColors[payload.status] || '#177251';
+      }
+    }
+
+    function updateCheckpointRow(zoneName) {
+      const rows = document.querySelectorAll('[data-checkpoint-name]');
+      rows.forEach(row => {
+        if (row.getAttribute('data-checkpoint-name') !== zoneName) return;
+
+        row.setAttribute('data-checkpoint-visited', 'true');
+        const icon = row.querySelector('[data-checkpoint-icon]');
+        if (icon) {
+          icon.className = 'w-5 h-5 rounded-sm bg-[#0b6c4b] flex items-center justify-center text-white text-[10px]';
+          icon.innerText = '✓';
+        }
+        const hint = row.querySelector('[data-checkpoint-hint]');
+        if (hint) hint.innerText = 'Checado';
+        const status = row.querySelector('[data-checkpoint-status]');
+        if (status) {
+          status.innerText = 'OK';
+          status.style.color = '#0b6c4b';
+        }
+      });
+
+      const total = rows.length;
+      const done = document.querySelectorAll('[data-checkpoint-name][data-checkpoint-visited="true"]').length;
+      const progress = document.getElementById('checkpoint-progress');
+      if (progress && total > 0) progress.innerText = `Progreso: ${done}/${total}`;
+    }
+
+    function renderDispatchQueue(payload) {
+      const list = document.getElementById('dispatch-queue-list');
+      if (!list) return;
+
+      list.innerHTML = '';
+      const slots = payload && Array.isArray(payload.slots) ? payload.slots : [];
+      if (slots.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'text-[#444748] italic';
+        empty.textContent = 'Sin unidades activas.';
+        list.appendChild(empty);
+        return;
+      }
+
+      slots.forEach(slot => {
+        const item = document.createElement('li');
+        item.className = 'flex items-center justify-between gap-2 border-b border-[#eeeeee] pb-1';
+        if (slot.unitId === payload.nextUnitId) {
+          item.style.backgroundColor = 'rgba(160, 244, 202, 0.35)';
+        }
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-2 min-w-0';
+        const position = document.createElement('span');
+        position.className = 'w-5 h-5 rounded-sm bg-[#0a0a0a] text-white text-[10px] font-bold flex items-center justify-center shrink-0';
+        position.textContent = slot.position;
+        const unit = document.createElement('span');
+        unit.className = 'font-bold text-[#1a1c1c] truncate';
+        unit.textContent = `U-${slot.unitId} · ${slot.driverAlias}`;
+        left.appendChild(position);
+        left.appendChild(unit);
+
+        const departure = new Date(Number(slot.scheduledDepartureEpochMs));
+        const right = document.createElement('span');
+        right.className = 'font-mono text-[10px] text-[#444748] shrink-0';
+        right.textContent = `Sale ${departure.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
+
+        item.title = `Multas: $${Number(slot.accumulatedFineMxn || 0).toFixed(2)} · Bono: $${Number(slot.bonusMxn || 0).toFixed(2)} · Exenciones FM: ${slot.forceMajeureExemptionsCount || 0}`;
+        item.appendChild(left);
+        item.appendChild(right);
+        list.appendChild(item);
+      });
+    }
+
+    function renderPassengerEta(payload) {
+      const etaEl = document.getElementById('eta-mins');
+      if (etaEl) etaEl.innerText = Number(payload.etaMinutes) > 0 ? payload.etaMinutes : '—';
+
+      const unitEl = document.getElementById('eta-unit-name');
+      if (unitEl) unitEl.innerText = `Unidad #${payload.nearestUnitId} en camino`;
+
+      const stopEl = document.getElementById('eta-stop-name');
+      if (stopEl) stopEl.innerText = `Llega a ${payload.stopName}`;
+
+      const occupancyEl = document.getElementById('eta-occupancy-badge');
+      if (occupancyEl) {
+        const labels = {
+          BAJA: 'Asientos Disponibles',
+          MEDIA: 'Aforo Medio',
+          LLENO: 'Unidad Llena'
+        };
+        occupancyEl.innerText = labels[payload.occupancyLevel] || 'Aforo no reportado';
+        occupancyEl.className = payload.occupancyLevel === 'LLENO'
+          ? 'inline-block bg-[#ffdad6] text-[#93000a] border border-[#ba1a1a] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase'
+          : 'inline-block bg-[#a0f4ca] text-[#177251] border border-[#0b6c4b] rounded-full px-2 py-0.5 text-[9px] font-bold uppercase';
+      }
+
+      const contextEl = document.getElementById('eta-context');
+      if (contextEl) {
+        const speed = Number(payload.filteredSpeedKmh || 0).toFixed(1);
+        const incidents = Number(payload.activeIncidentsCount || 0);
+        const distance = Math.round(Number(payload.distanceMeters || 0));
+        contextEl.innerText = `${speed} km/h · ${incidents} incidencia(s) · ${distance} m${payload.isStaleCache ? ' · caché' : ''}`;
+      }
+    }
+
+    function renderForceMajeure(payload) {
+      const banner = document.getElementById('force-majeure-banner');
+      const text = document.getElementById('force-majeure-status-text');
+      const badge = document.getElementById('force-majeure-status-badge');
+      if (!banner || !text || !badge) return;
+
+      const count = Number(payload.qualifyingUnitsCount || 0);
+      const minimum = Number(payload.minimumDistinctUnits || 3);
+
+      if (payload.isExempt) {
+        text.innerText = `FUERZA MAYOR ACTIVA · ${count} UNID`;
+        badge.innerText = 'EXENCIÓN AUTO';
+        banner.style.backgroundColor = '#a0f4ca';
+        banner.style.borderColor = '#0b6c4b';
+      } else {
+        text.innerText = `MONITOREO FM · ${count}/${minimum}`;
+        badge.innerText = 'SIN EXENCIÓN';
+        banner.style.backgroundColor = '#eeeeee';
+        banner.style.borderColor = '#c4c7c7';
+      }
+      banner.title = payload.reasonSummary || '';
+    }
+
+    function renderFinancialSummary(payload) {
+      const money = value => `$${Number(value || 0).toFixed(0)}`;
+      const activeEl = document.getElementById('metric-active-units');
+      if (activeEl) activeEl.innerText = `${payload.activeUnits} / ${payload.fleetSize}`;
+      const saasEl = document.getElementById('metric-saas');
+      if (saasEl) saasEl.innerText = money(payload.saasTotalMxn);
+      const bonusEl = document.getElementById('metric-bonuses');
+      if (bonusEl) bonusEl.innerText = money(payload.bonusTotalMxn);
+      const finesEl = document.getElementById('metric-fines');
+      if (finesEl) finesEl.innerText = money(payload.netFinesMxn);
+    }
+
+    function requestPassengerEta() {
+      if (!(window.CronoBusNative && typeof window.CronoBusNative.requestPassengerEta === 'function')) {
+        const contextEl = document.getElementById('eta-context');
+        if (contextEl) contextEl.innerText = 'Vista previa: telemetría nativa no conectada.';
+        return;
+      }
+      const routeId = document.getElementById('passenger-route-select')?.value || 'Ruta 42 - Centro/Diana';
+      const stopId = document.getElementById('passenger-stop-select')?.value || 'diana';
+      window.CronoBusNative.requestPassengerEta(routeId, stopId);
+    }
+
+    function requestDispatchQueue() {
+      if (window.CronoBusNative && typeof window.CronoBusNative.requestDispatchQueue === 'function') {
+        window.CronoBusNative.requestDispatchQueue();
+      }
+    }
+
+    function dispatchNextUnit() {
+      if (window.CronoBusNative && typeof window.CronoBusNative.dispatchNextUnit === 'function') {
+        window.CronoBusNative.dispatchNextUnit();
+        return;
+      }
+      alert('La cola de despacho rotativa está disponible en la app Android.');
     }
 
 
@@ -1022,14 +1321,74 @@
       },
       onTelemetry(payload) {
         if (!payload) return;
-        // Último fix filtrado por Kalman; disponible para headway y ETA en la Fase 4.
+        // Último fix filtrado por Kalman; la unidad 14 del mapa pasa a reflejar el GPS real.
         window.__cronobusLastFix = payload;
         window.__cronobusOccupancy = payload.occupancy;
+        window.__cronobusNativeActive = true;
+
+        const nativeUnit = units.find(u => u.id === 14);
+        const lat = Number(payload.lat);
+        const lng = Number(payload.lng);
+        if (nativeUnit && Number.isFinite(lat) && Number.isFinite(lng)) {
+          nativeUnit.lat = lat;
+          nativeUnit.lng = lng;
+          updateMarkers();
+        }
       },
       onGeofence(payload) {
         if (!payload) return;
         window.__cronobusLastGeofence = payload;
+        if (payload.transition === 'ENTER') {
+          updateCheckpointRow(payload.zoneName);
+        }
         console.log(`[CronoBus] Geocerca ${payload.transition}: ${payload.zoneName}`);
+      },
+      onHeadway(payload) {
+        if (!payload) return;
+        renderHeadway(payload);
+
+        const delta = formatHeadwayClock(payload.deltaSeconds);
+        if (payload.status === 'LATE_FINE') {
+          addAdminAlert(
+            'HEADWAY · RETRASO',
+            `${payload.checkpointName}: ${delta} vs objetivo (sanción $${Number(payload.suggestedFineAmountMxn).toFixed(0)}).`,
+            '#ba1a1a'
+          );
+        } else if (payload.status === 'EXEMPT_FORCE_MAJEURE') {
+          addAdminAlert(
+            'HEADWAY · EXENTO FM',
+            `${payload.checkpointName}: ${delta} condonado por fuerza mayor.`,
+            '#0b6c4b'
+          );
+        } else if (payload.status === 'WARNING') {
+          addAdminAlert(
+            'HEADWAY · PREVENTIVO',
+            `${payload.checkpointName}: ${delta} fuera de la ventana objetivo.`,
+            '#ffba38'
+          );
+        }
+      },
+      onForceMajeure(payload) {
+        if (!payload) return;
+        renderForceMajeure(payload);
+      },
+      onDispatchQueue(payload) {
+        if (!payload) return;
+        renderDispatchQueue(payload);
+      },
+      onPassengerEta(payload) {
+        if (!payload) return;
+        renderPassengerEta(payload);
+      },
+      onPassengerEtaUnavailable(payload) {
+        const etaEl = document.getElementById('eta-mins');
+        if (etaEl) etaEl.innerText = '—';
+        const contextEl = document.getElementById('eta-context');
+        if (contextEl) contextEl.innerText = payload?.message || 'Sin telemetría disponible.';
+      },
+      onFinancialSummary(payload) {
+        if (!payload) return;
+        renderFinancialSummary(payload);
       },
       onTamper(payload) {
         if (!payload) return;
@@ -1060,16 +1419,34 @@
       onNativeEvent(payload) {
         if (!payload) return;
         console.log(`[CronoBus] ${payload.event}`, payload);
+
         if (payload.event === 'error') {
           alert(`CronoBus: ${payload.message}`);
         } else if (payload.event === 'shiftStarted') {
           window.__cronobusShiftId = payload.shiftId;
+          requestDispatchQueue();
         } else if (payload.event === 'incidenceReported') {
           alert(`Incidencia guardada en el dispositivo (pendiente de sincronizar: ${payload.pendingSyncCount}).`);
         } else if (payload.event === 'disputeFiled') {
+          const statusEl = document.getElementById('photo-evidence-status');
+          if (statusEl) {
+            statusEl.innerText = 'Sin foto adjunta';
+            statusEl.style.color = '#444748';
+          }
           alert(`Apelación guardada (pendiente de sincronizar: ${payload.pendingSyncCount}).`);
         } else if (payload.event === 'occupancyUpdated') {
           alert(`Aforo actualizado: ${payload.level}`);
+        } else if (payload.event === 'photoCaptured') {
+          const statusEl = document.getElementById('photo-evidence-status');
+          if (statusEl) {
+            const kb = Math.max(1, Math.round(Number(payload.sizeBytes || 0) / 1024));
+            statusEl.innerText = `📷 ${payload.fileName} (${kb} KB)`;
+            statusEl.style.color = '#0b6c4b';
+          }
+        } else if (payload.event === 'csvExported') {
+          alert(`CSV generado: ${payload.fileName}\n${payload.rowCount} fila(s). Elige una app para compartirlo.`);
+        } else if (payload.event === 'dispatchAdvanced') {
+          console.log(`[CronoBus] Despacho: U-${payload.unitId} · ${payload.queueSize} en cola.`);
         }
       }
     };
@@ -1097,6 +1474,7 @@
 
       initMaps();
       initDarkMode();
+      requestDispatchQueue();
       console.log("CronoBus logic initialized.");
       requestAnimationFrame(tick);
     }

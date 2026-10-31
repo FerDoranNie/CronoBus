@@ -31,6 +31,26 @@ interface ShiftLogDao {
     )
     suspend fun getActiveShift(): ShiftLogEntity?
 
+    /** Todas las unidades con turno abierto, ordenadas por antigüedad de inicio. */
+    @Query(
+        """
+        SELECT * FROM shift_logs
+        WHERE endTimestampUtcMs IS NULL
+        ORDER BY startTimestampUtcMs ASC
+        """,
+    )
+    suspend fun getActiveShifts(): List<ShiftLogEntity>
+
+    /** Turnos recientes para el resumen financiero y la cola de despacho. */
+    @Query(
+        """
+        SELECT * FROM shift_logs
+        ORDER BY startTimestampUtcMs DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun getRecentShifts(limit: Int): List<ShiftLogEntity>
+
     @Query(
         """
         UPDATE shift_logs

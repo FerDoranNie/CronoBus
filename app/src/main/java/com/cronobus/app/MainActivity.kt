@@ -1,6 +1,8 @@
 package com.cronobus.app
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -12,6 +14,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.cronobus.app.bridge.CapturePhotoContract
 import com.cronobus.app.bridge.CronoBusJsBridge
 import com.cronobus.app.data.sync.StoreAndForwardSyncManager
 import com.cronobus.app.service.LocationTrackingService
@@ -58,6 +62,29 @@ class MainActivity : ComponentActivity() {
         bridge.onLocationPermissionResult(fineGranted)
     }
 
+    /**
+     * Captura de evidencia con la app de cámara del sistema. El contrato propio concede el URI
+     * de FileProvider a la cámara; al volver, el puente valida que el archivo no esté vacío.
+     */
+    private val takePictureLauncher = registerForActivityResult(CapturePhotoContract()) { success ->
+        bridge.onPhotoCaptureResult(success)
+    }
+
+    /** URI pendiente mientras se concede el permiso de cámara. */
+    private var pendingCaptureUri: Uri? = null
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val uri = pendingCaptureUri
+        pendingCaptureUri = null
+        if (granted && uri != null) {
+            launchCamera(uri)
+        } else {
+            bridge.onPhotoCaptureLaunchFailed("Permiso de cámara denegado.")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -66,6 +93,16 @@ class MainActivity : ComponentActivity() {
         bridge = CronoBusJsBridge(this, syncManager = syncManager).apply {
             onLocationPermissionRequired = {
                 if (!isFinishing && !isDestroyed) requestLocationPermission()
+            }
+            onCapturePhotoRequested = { uri ->
+                if (!isFinishing && !isDestroyed) {
+                    requestCameraCapture(uri)
+                } else {
+                    bridge.onPhotoCaptureLaunchFailed("La Activity ya no está disponible.")
+                }
+            }
+            onCsvReadyForShare = { uri ->
+                if (!isFinishing && !isDestroyed) shareCsv(uri)
             }
         }
 
@@ -103,6 +140,60 @@ class MainActivity : ComponentActivity() {
             }
         }
         locationPermissionLauncher.launch(permissions.toTypedArray())
+    }
+
+    /** Pide CAMERA si hace falta y luego abre la app de cámara con el URI de FileProvider. */
+    private fun requestCameraCapture(uri: Uri) {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            launchCamera(uri)
+            return
+        }
+        pendingCaptureUri = uri
+        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    private fun launchCamera(uri: Uri) {
+        try {
+            takePictureLauncher.launch(uri)
+        } catch (notFound: ActivityNotFoundException) {
+            bridge.onPhotoCaptureLaunchFailed(
+                "No hay una app de cámara instalada en el dispositivo.",
+            )
+        } catch (failure: Throwable) {
+            Log.e(TAG, "No se pudo abrir la cámara.", failure)
+            bridge.onPhotoCaptureLaunchFailed("No se pudo abrir la cámara.")
+        }
+    }
+
+    /** Comparte el CSV mediante una URI `content://` de FileProvider, sin exponer rutas. */
+    private fun shareCsv(uri: Uri) {
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(
+                Intent.createChooser(shareIntent, "Exportar resumen financiero CronoBus"),
+            )
+        } catch (notFound: ActivityNotFoundException) {
+            Toast.makeText(
+                this,
+                "No hay una app disponible para compartir el CSV.",
+                Toast.LENGTH_LONG,
+            ).show()
+        } catch (failure: Throwable) {
+            Log.e(TAG, "No se pudo abrir el selector para compartir el CSV.", failure)
+            Toast.makeText(
+                this,
+                "No se pudo compartir el CSV generado.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     /**

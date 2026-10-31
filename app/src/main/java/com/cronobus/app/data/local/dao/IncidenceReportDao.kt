@@ -109,6 +109,23 @@ interface IncidenceReportDao {
         limit: Int,
     ): List<IncidenceReportEntity>
 
+    /**
+     * Incidencias recientes de cualquier tipo para el ETA del pasajero. A diferencia de la
+     * exención de fuerza mayor, un accidente o una falla mecánica también retrasan la unidad.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM incidence_reports
+        WHERE routeId = :routeId
+          AND incidenceType IN ('TRAFFIC', 'BLOCKADE', 'ACCIDENT', 'MECHANICAL_FAILURE')
+          AND timestampUtcMs >= :sinceUtcMs
+        """,
+    )
+    suspend fun countRecentRouteIncidents(
+        routeId: String,
+        sinceUtcMs: Long,
+    ): Int
+
     /** Historial reciente de un tramo, útil para el panel de despacho. */
     @Query(
         """
