@@ -1,0 +1,260 @@
+/* ==========================================================================
+   CronoBus - Leaflet Offline Stylesheet (Classic Signal Design System)
+   Proporciona renderizado 100% autónomo y offline para Leaflet / OfflineCanvas.
+   Bordes: 1px (#c4c7c7) | Sombras: 4px 4px 0px rgba(10,10,10,0.1) | Cero blur
+   ========================================================================== */
+
+/* --- Contenedor Principal del Mapa --- */
+.leaflet-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #f9f9f9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0a0a0a;
+  overflow: hidden;
+  outline: 0;
+  border: 1px solid #c4c7c7;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --- Canvas y Paneles de Capa Offline --- */
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.leaflet-OfflineCanvas,
+.leaflet-offline-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* --- Posicionamiento de Controles --- */
+.leaflet-control {
+  position: relative;
+  z-index: 800;
+  pointer-events: auto;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.leaflet-top {
+  top: 0;
+}
+
+.leaflet-bottom {
+  bottom: 0;
+}
+
+.leaflet-left {
+  left: 0;
+}
+
+.leaflet-right {
+  right: 0;
+}
+
+/* --- Controles de Zoom (Classic Signal Hard Button) --- */
+.leaflet-control-zoom {
+  margin: 12px;
+  background: #ffffff;
+  border: 1px solid #c4c7c7;
+  box-shadow: 4px 4px 0px rgba(10, 10, 10, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #ffffff;
+  color: #0a0a0a;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 32px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.leaflet-control-zoom-in {
+  border-bottom: 1px solid #c4c7c7;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background-color: #a0f4ca;
+  color: #0b6c4b;
+}
+
+.leaflet-control-zoom-in:active,
+.leaflet-control-zoom-out:active {
+  background-color: #0b6c4b;
+  color: #ffffff;
+}
+
+/* --- Popups Classic Signal --- */
+.leaflet-popup {
+  position: absolute;
+  text-align: left;
+  z-index: 1000;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #ffffff;
+  color: #0a0a0a;
+  padding: 4px;
+  text-align: left;
+  border: 1px solid #c4c7c7;
+  border-radius: 0;
+  box-shadow: 4px 4px 0px rgba(10, 10, 10, 0.1);
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.4;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.leaflet-popup-tip-container {
+  width: 20px;
+  height: 10px;
+  position: absolute;
+  left: 50%;
+  margin-left: -10px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.leaflet-popup-tip {
+  width: 10px;
+  height: 10px;
+  padding: 1px;
+  margin: -5px auto 0;
+  transform: rotate(45deg);
+  background: #ffffff;
+  border: 1px solid #c4c7c7;
+  box-shadow: 2px 2px 0px rgba(10, 10, 10, 0.08);
+}
+
+.leaflet-popup-close-button {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  padding: 4px 6px;
+  text-align: center;
+  width: 18px;
+  height: 18px;
+  font: 16px/14px Tahoma, Verdana, sans-serif;
+  color: #444748;
+  text-decoration: none;
+  font-weight: bold;
+  background: transparent;
+  cursor: pointer;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #ba1a1a;
+}
+
+/* --- Marcador de Autobús Personalizado (Classic Signal) --- */
+.custom-bus-icon {
+  background: #0b6c4b;
+  color: #ffffff;
+  border: 1px solid #0a0a0a;
+  box-shadow: 2px 2px 0px rgba(10, 10, 10, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+
+.custom-bus-icon.accent-bus {
+  background: #ffba38;
+  color: #0a0a0a;
+}
+
+.custom-bus-icon.alert-bus {
+  background: #ba1a1a;
+  color: #ffffff;
+}
+
+/* --- Soporte CronoBus Dark Mode --- */
+body.dark-mode .leaflet-container {
+  background-color: #141313;
+  color: #e5e2e1;
+  border-color: #444748;
+}
+
+body.dark-mode .leaflet-control-zoom {
+  background: #201f1f;
+  border-color: #444748;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .leaflet-control-zoom-in,
+body.dark-mode .leaflet-control-zoom-out {
+  background-color: #201f1f;
+  color: #e5e2e1;
+}
+
+body.dark-mode .leaflet-control-zoom-in {
+  border-bottom: 1px solid #444748;
+}
+
+body.dark-mode .leaflet-control-zoom-in:hover,
+body.dark-mode .leaflet-control-zoom-out:hover {
+  background-color: #3c494f;
+  color: #a0f4ca;
+}
+
+body.dark-mode .leaflet-popup-content-wrapper {
+  background: #201f1f;
+  color: #e5e2e1;
+  border-color: #444748;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .leaflet-popup-tip {
+  background: #201f1f;
+  border-color: #444748;
+}
+
+body.dark-mode .leaflet-popup-close-button {
+  color: #c4c7c7;
+}
+
+body.dark-mode .leaflet-popup-close-button:hover {
+  color: #ffb4ab;
+}
