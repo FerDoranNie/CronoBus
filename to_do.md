@@ -90,13 +90,13 @@ Este documento rastrea el estado real de implementación de **CronoBus**, separa
   - [x] Pruebas de persistencia de cruces de geocerca, consultas espaciales de Fuerza Mayor en Room y validación de migración no destructiva `1 → 2` ([`CronoBusDatabaseMigrationTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/data/local/CronoBusDatabaseMigrationTest.kt)).
 - [ ] **5.3 Pruebas de Regresión Visual (Roborazzi):**
   - [x] Migrar [`GreetingScreenshotTest.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/test/java/com/cronobus/app/GreetingScreenshotTest.kt) a `com.cronobus.app` con tema *Classic Signal*.
-  - [ ] Expandir capturas de pantalla para las vistas principales.
+  - [ ] Expandir componentes Compose de referencia visual (`CronoBusDesignShowcase.kt`) y capturas de pantalla Roborazzi para las 3 vistas principales (Conductor, Admin, Pasajero + Dark Mode).
 - [ ] **5.4 Pendientes Registrados en Auditoría del Paso 3 (Semana 3 → Semana 4):**
-  - [ ] Persistir el *ledger* financiero de sesión (`SessionState.ledger` / sanciones y condonaciones por unidad) en Room para que sobreviva a muerte del proceso antes de exportar el `.csv`.
-  - [ ] Migrar el directorio de `dispute_photos` de `cache-path` a `files-path` en `res/xml/file_paths.xml` y [`DisputePhotoStore.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/export/DisputePhotoStore.kt) para evitar que el sistema operativo purgue evidencias fotográficas pendientes de sincronizar bajo presión de almacenamiento.
-  - [ ] Completar empaquetado local de `Leaflet.js` en `assets/` y migración de entrada a `WebViewAssetLoader` (`https://appassets.androidplatform.net/`).
+  - [ ] Persistir el *ledger* financiero de sesión (`FinancialLedgerEntity` + `FinancialLedgerDao` + migración Room `2 → 3`) para que sanciones y condonaciones por unidad sobrevivan a muerte del proceso antes de exportar el `.csv`.
+  - [ ] Migrar el directorio de `dispute_photos` de `cache-path` a `files-path` en [`file_paths.xml`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/res/xml/file_paths.xml) y [`DisputePhotoStore.kt`](file:///c:/Users/fernando.dorantes/local/scripts/proyectos/app_rutas/app/src/main/java/com/cronobus/app/data/export/DisputePhotoStore.kt) para evitar que el sistema operativo purgue evidencias fotográficas pendientes de sincronizar bajo presión de almacenamiento.
+  - [ ] Completar empaquetado local de `Leaflet.js` (`leaflet_offline.js` + `leaflet_offline.css` en `assets/`, motor de mapa vectorial/SVG offline 100% compatible con la API `L.map` / `L.tileLayer` / `L.polyline` / `L.circle` / `L.marker` / `L.divIcon`) y migración de entrada a `WebViewAssetLoader` (`https://appassets.androidplatform.net/assets/cronobus.html`) con `androidx.webkit:webkit`.
 - [ ] **5.5 Verificación de Build & Lint:**
   - [x] Semana 1: `./gradlew testDebugUnitTest assembleDebug` en verde (49 tareas ejecutadas, 31 tests OK).
   - [x] Semana 2: `./gradlew testDebugUnitTest assembleDebug` en verde (49 tareas ejecutadas, 35 tests OK, KSP Room + Robolectric OK).
   - [x] Semana 3: `./gradlew testDebugUnitTest assembleDebug` en verde (66 tests unitarios/Robolectric OK, migración Room 1→2 validada y APK Debug ensamblado).
-  - [ ] Cierre final: `./gradlew lintDebug`, `./gradlew testDebugUnitTest` y `./gradlew assembleDebug` sin warnings críticos ni errores.
+  - [ ] Cierre final (Semana 4): `./gradlew lintDebug`, `./gradlew testDebugUnitTest` y `./gradlew assembleDebug` sin warnings críticos ni errores.
