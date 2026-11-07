@@ -11,6 +11,7 @@ import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -28,6 +29,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.webkit.WebViewAssetLoader
 import com.cronobus.app.bridge.CapturePhotoContract
 import com.cronobus.app.bridge.CronoBusJsBridge
 import com.cronobus.app.data.sync.StoreAndForwardSyncManager
@@ -41,11 +43,15 @@ import kotlinx.coroutines.launch
  *
  * La UI sigue siendo la SPA local de `assets/`, pero el `WebView` queda **endurecido** y conectado
  * al núcleo nativo:
- * - Sin acceso al sistema de archivos ni a `content://` (los assets se sirven por
- *   `file:///android_asset/`, que WebView mantiene disponible aunque `allowFileAccess = false`).
+ * - Los assets se sirven con `WebViewAssetLoader` en el origen HTTPS sintético
+ *   `https://appassets.androidplatform.net/assets/`; así `localStorage`, el mapa offline y las
+ *   rutas relativas funcionan sin conceder acceso al sistema de archivos ni depender de un CDN.
+ * - `allowFileAccess = false` y `allowContentAccess = false`: el contenedor no puede leer archivos
+ *   privados ni `content://` ajenos.
  * - `MIXED_CONTENT_NEVER_ALLOW`: ninguna petición HTTP plana puede colarse en la sesión segura.
- * - Navegación restringida al origen local (`file://` / `about:`); cualquier enlace externo se
- *   bloquea en lugar de abrir una página arbitraria dentro del contenedor con el puente expuesto.
+ * - Navegación restringida al origen local (`appassets.../assets/` / `about:`); cualquier enlace
+ *   externo se bloquea en lugar de abrir una página arbitraria dentro del contenedor con el
+ *   puente expuesto.
  * - El puente `window.CronoBusNative` solo existe mientras este WebView local está montado.
  */
 class MainActivity : ComponentActivity() {
@@ -258,7 +264,9 @@ class MainActivity : ComponentActivity() {
 private const val TAG = "CronoBusMainActivity"
 private const val STATE_PENDING_CAPTURE_URI = "cronobus.pendingCaptureUri"
 private const val STATE_PENDING_PHOTO_NAME = "cronobus.pendingPhotoName"
-private const val LOCAL_ENTRY_URL = "file:///android_asset/cronobus.html"
+private const val ASSET_LOADER_DOMAIN = "appassets.androidplatform.net"
+private const val ASSET_PATH_PREFIX = "/assets/"
+private const val LOCAL_ENTRY_URL = "https://appassets.androidplatform.net/assets/cronobus.html"
 
 @Composable
 fun WebViewScreen(
@@ -268,6 +276,13 @@ fun WebViewScreen(
     AndroidView(
         modifier = modifier,
         factory = { context ->
+            // Sirve los assets locales desde un origen HTTPS sintético, sin CDN ni file://.
+            // El handler se crea por WebView para que su ciclo de vida siga al contenedor.
+            val assetLoader = WebViewAssetLoader.Builder()
+                .setDomain(ASSET_LOADER_DOMAIN)
+                .addPathHandler(ASSET_PATH_PREFIX, WebViewAssetLoader.AssetsPathHandler(context))
+                .build()
+
             WebView(context).apply {
                 setBackgroundColor(android.graphics.Color.WHITE)
 
@@ -281,8 +296,8 @@ fun WebViewScreen(
                     mediaPlaybackRequiresUserGesture = true
 
                     // --- Endurecimiento (OWASP MASVS / WebView) ---
-                    // Los assets siguen accesibles vía file:///android_asset pese a desactivar
-                    // el acceso al resto del sistema de archivos (documentado por Android).
+                    // WebViewAssetLoader sirve los assets por HTTPS sintético; el resto del
+                    // sistema de archivos y los content:// permanecen inaccesibles.
                     allowFileAccess = false
                     allowContentAccess = false
                     @Suppress("DEPRECATION")
@@ -301,6 +316,11 @@ fun WebViewScreen(
                 bridge?.let { addJavascriptInterface(it, CronoBusJsBridge.JS_INTERFACE_NAME) }
 
                 webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
                     override fun shouldOverrideUrlLoading(
                         view: WebView,
                         request: WebResourceRequest,
@@ -346,15 +366,12 @@ fun WebViewScreen(
 }
 
 private fun isLocalOrigin(uri: Uri): Boolean {
-    // Auditoría Paso 3: antes se aceptaba cualquier `file://` y cualquier esquema hacia
-    // appassets. Con el puente expuesto, el allowlist debe ser exacto.
-    val scheme = uri.scheme?.lowercase()
-    return when (scheme) {
-        "file" -> uri.path?.startsWith(ANDROID_ASSET_PATH) == true
+    // Auditoría Paso 3 / Fase 5: con el puente expuesto el allowlist debe ser exacto. Ya no se
+    // acepta ningún `file://`; los assets llegan exclusivamente por WebViewAssetLoader.
+    return when (uri.scheme?.lowercase()) {
+        "https" -> uri.host == ASSET_LOADER_DOMAIN &&
+            uri.path?.startsWith(ASSET_PATH_PREFIX) == true
         "about" -> uri.toString() == "about:blank"
-        "https" -> uri.host == "appassets.androidplatform.net"
         else -> false
     }
 }
-
-private const val ANDROID_ASSET_PATH = "/android_asset/"

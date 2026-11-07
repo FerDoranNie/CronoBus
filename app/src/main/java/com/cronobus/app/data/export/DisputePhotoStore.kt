@@ -9,7 +9,7 @@ import java.util.UUID
 /**
  * Foto de evidencia recién capturada, todavía no vinculada a una apelación.
  *
- * @param file Archivo privado en `cache/dispute_photos/`.
+ * @param file Archivo privado persistente en `files/dispute_photos/`.
  * @param uri URI `content://` autorizada temporalmente a la app de cámara.
  */
 data class DisputePhoto(
@@ -18,16 +18,18 @@ data class DisputePhoto(
 )
 
 /**
- * Gestiona las fotos de evidencia de apelaciones dentro de la caché privada de la app.
+ * Gestiona las fotos de evidencia de apelaciones dentro del almacenamiento privado **persistente**
+ * de la app (`filesDir`).
  *
  * - Usa `FileProvider` (autoridad `${applicationId}.fileprovider`) para que la app de cámara pueda
- *   escribir en el archivo sin conceder acceso a toda la caché.
+ *   escribir en el archivo sin conceder acceso a todo el almacenamiento privado.
  * - Nunca expone `File.getAbsolutePath()` al WebView.
  * - [cleanupStale] elimina capturas huérfanas de sesiones anteriores para no crecer sin límite.
  *
- * Nota de producción: la evidencia se guarda en caché porque el Store & Forward la sube en cuanto
- * hay red. Si se requiere conservarla indefinidamente, mover el `cache-path` de
- * `res/xml/file_paths.xml` a un `files-path` persistente.
+ * Producción: la evidencia vive en `filesDir` (no en caché) porque el Store & Forward puede tardar
+ * horas o días en subirla y el sistema operativo purga `cacheDir` bajo presión de almacenamiento.
+ * La raíz `files-path` está declarada en `res/xml/file_paths.xml`; la antigua raíz `cache-path`
+ * se conserva solo para leer capturas heredadas de versiones anteriores.
  */
 class DisputePhotoStore(
     context: Context,
@@ -37,7 +39,7 @@ class DisputePhotoStore(
     private val appContext = context.applicationContext
 
     private val photoDirectory: File
-        get() = File(appContext.cacheDir, PHOTO_DIRECTORY).apply {
+        get() = File(appContext.filesDir, PHOTO_DIRECTORY).apply {
             if (!exists() && !mkdirs()) {
                 error("No se pudo crear el directorio de evidencia fotográfica.")
             }
@@ -45,9 +47,7 @@ class DisputePhotoStore(
 
     /** Crea una captura vacía y devuelve su archivo + URI para la app de cámara. */
     fun createPhoto(): DisputePhoto {
-        // No se borran capturas antiguas automáticamente: una apelación puede seguir en la cola
-        // offline más de 24 h y su URI debe seguir siendo válida hasta que se sincronice.
-        val file = File(photoDirectory, "dispute_${UUID.randomUUID()}.jpg")
+        val file = newPhotoFile()
         val uri = FileProvider.getUriForFile(
             appContext,
             "${appContext.packageName}$FILE_PROVIDER_SUFFIX",
@@ -57,12 +57,23 @@ class DisputePhotoStore(
     }
 
     /**
+     * Reserva un nombre de archivo único en el directorio persistente.
+     *
+     * Se separa de [createPhoto] para poder verificar en pruebas JVM que la ruta es `filesDir`
+     * sin depender de la resolución de raíces de `FileProvider` de Robolectric.
+     */
+    internal fun newPhotoFile(): File =
+        // No se borran capturas antiguas automáticamente: una apelación puede seguir en la cola
+        // offline más de 24 h y su URI debe seguir siendo válida hasta que se sincronice.
+        File(photoDirectory, "dispute_${UUID.randomUUID()}.jpg")
+
+    /**
      * Reconstruye una captura a partir del nombre guardado en `onSaveInstanceState`.
      * Solo acepta el patrón generado por [createPhoto] para impedir *path traversal*.
      */
     fun fromFileName(fileName: String): DisputePhoto? {
         if (!SAFE_NAME.matches(fileName)) return null
-        val file = File(photoDirectory, fileName)
+        val file = resolveExistingPhoto(fileName)
         val uri = runCatching {
             FileProvider.getUriForFile(
                 appContext,
@@ -71,6 +82,17 @@ class DisputePhotoStore(
             )
         }.getOrNull() ?: return null
         return DisputePhoto(file = file, uri = uri)
+    }
+
+    /**
+     * Las capturas nuevas viven en `filesDir`; si quedó una pendiente de una versión anterior en
+     * `cacheDir`, se resuelve aquí para no perder la evidencia al actualizar la app.
+     */
+    private fun resolveExistingPhoto(fileName: String): File {
+        val persistent = File(photoDirectory, fileName)
+        if (persistent.exists()) return persistent
+        val legacy = File(appContext.cacheDir, PHOTO_DIRECTORY).let { File(it, fileName) }
+        return if (legacy.exists()) legacy else persistent
     }
 
     /** La cámara pudo cancelar o escribir un archivo de 0 bytes. */

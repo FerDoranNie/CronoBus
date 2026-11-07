@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Rutas en almacenamiento persistente y caché interna para evidencia fotográfica de apelaciones y exportaciones CSV -->
+    <!--
+        Evidencia fotográfica de apelaciones: raíz persistente (files-path) para que el sistema
+        operativo no la purgue bajo presión de almacenamiento. La raíz de caché se conserva como
+        "legacy" únicamente para leer capturas pendientes de versiones anteriores.
+        El CSV de cierre de turno sigue siendo efímero y se comparte desde caché.
+    -->
     <files-path name="dispute_photos" path="dispute_photos/" />
     <cache-path name="dispute_photos_legacy" path="dispute_photos/" />
     <cache-path name="exports" path="exports/" />

@@ -18,6 +18,7 @@ import com.cronobus.app.data.local.OccupancyLevel
 import com.cronobus.app.data.local.dao.CheckpointEventDao
 import com.cronobus.app.data.local.dao.IncidenceReportDao
 import com.cronobus.app.data.local.entity.CheckpointEventEntity
+import com.cronobus.app.data.local.entity.FinancialLedgerEntity
 import com.cronobus.app.data.local.entity.FineDisputeEntity
 import com.cronobus.app.data.local.entity.IncidenceReportEntity
 import com.cronobus.app.data.local.entity.ShiftLogEntity
@@ -105,6 +106,7 @@ class CronoBusJsBridge(
     private val appContext = context.applicationContext
     private val shiftDao = database.shiftLogDao()
     private val disputeDao = database.fineDisputeDao()
+    private val ledgerDao = database.financialLedgerDao()
 
     /**
      * Auditoría Paso 3: las escrituras en Room viven en un scope de **proceso**, no de Activity.
@@ -121,6 +123,16 @@ class CronoBusJsBridge(
      * y sanciones en el ledger. Se serializa el registro completo del checador.
      */
     private val checkpointMutex = Mutex()
+
+    /**
+     * Hidratación única del ledger financiero desde Room. Varias corrutinas (resumen, despacho,
+     * exportación CSV y cruces del checador) pueden pedir el estado a la vez; el mutex evita leer
+     * la tabla dos veces y publicar un resumen incompleto.
+     */
+    private val ledgerHydrationMutex = Mutex()
+
+    @Volatile
+    private var ledgerHydrated = false
 
     /** Evita turnos duplicados por doble toque en "Iniciar Turno" mientras el primero persiste. */
     private val shiftStartInFlight = AtomicBoolean(false)
@@ -188,8 +200,10 @@ class CronoBusJsBridge(
      * rotación, pero la cola de despacho, el aforo, las métricas del CSV y la foto pendiente deben
      * sobrevivir mientras viva el proceso.
      *
-     * El estado es de sesión, no persistente: al morir el proceso se reconstruye desde Room para
-     * turnos/colas, y el estado financiero vuelve a cero (Fase 5 lo persistirá).
+     * `ledger` es una caché de lectura del ledger persistido en Room (`financial_ledger`). Al
+     * arrancar el proceso se hidrata desde la base; cada evaluación se escribe de forma
+     * incremental y transaccional, de modo que una muerte del proceso no pierde sanciones ni
+     * condonaciones antes de exportar el `.csv`.
      */
     private object SessionState {
         val ledger = ConcurrentHashMap<String, UnitFinancialState>()
@@ -214,6 +228,9 @@ class CronoBusJsBridge(
     }
 
     init {
+        // Recupera el ledger antes de emitir el primer resumen financiero.
+        scope.launch { ensureFinancialLedgerHydrated() }
+
         // Recupera el turno tras recrear la Activity o reiniciar el proceso.
         scope.launch {
             runCatching { shiftDao.getActiveShift() }
@@ -902,6 +919,7 @@ class CronoBusJsBridge(
     }
 
     private suspend fun pushFinancialSummary() {
+        ensureFinancialLedgerHydrated()
         val shifts = runCatching { shiftDao.getRecentShifts(FINANCIAL_SHIFT_LIMIT) }
             .getOrDefault(emptyList())
         val units = LinkedHashMap<String, String>()
@@ -942,6 +960,41 @@ class CronoBusJsBridge(
     // ---------------------------------------------------------------------------------------------
     // Persistencia del checador, headway y métricas
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Carga en [SessionState.ledger] el acumulado persistido. `putIfAbsent` conserva el estado en
+     * memoria si ya es más reciente (misma sesión, rotación de Activity).
+     */
+    private suspend fun ensureFinancialLedgerHydrated() {
+        if (ledgerHydrated) return
+
+        ledgerHydrationMutex.withLock {
+            if (ledgerHydrated) return
+
+            val persisted = runCatching { ledgerDao.getAll() }
+            if (persisted.isFailure) {
+                Log.w(
+                    TAG,
+                    "No se pudo leer el ledger financiero persistido.",
+                    persisted.exceptionOrNull(),
+                )
+                return
+            }
+
+            persisted.getOrThrow().forEach { entity ->
+                SessionState.ledger.putIfAbsent(entity.unitId, entity.toSessionState())
+            }
+            ledgerHydrated = true
+        }
+    }
+
+    private fun FinancialLedgerEntity.toSessionState() = UnitFinancialState(
+        routeId = routeId,
+        grossFinesMxn = grossFinesMxn,
+        forgivenFinesMxn = forgivenFinesMxn,
+        assessments = assessmentsCount,
+        exemptions = exemptionsCount,
+    )
 
     private suspend fun recordCheckpoint(event: GeofenceEvent) {
         try {
@@ -998,7 +1051,7 @@ class CronoBusJsBridge(
         }
 
         if (assessment != null) {
-            updateFinancialLedger(shift.unitId, shift.routeId, assessment)
+            updateFinancialLedger(shift.unitId, shift.routeId, assessment, observedAtUtcMs)
             pushHeadwayAssessment(assessment, shift.unitId)
         }
         pushForceMajeure(forceMajeure)
@@ -1010,7 +1063,12 @@ class CronoBusJsBridge(
         unitId: String,
         routeId: String,
         assessment: HeadwayAssessment,
+        observedAtUtcMs: Long,
     ) {
+        // La caché debe partir del acumulado persistido; de lo contrario un reinicio del proceso
+        // haría que el primer cruce pareciera la única sanción de la unidad.
+        ensureFinancialLedgerHydrated()
+
         val theoreticalFine = when (assessment.status) {
             HeadwayStatus.LATE_FINE -> assessment.suggestedFineAmountMxn
             HeadwayStatus.EXEMPT_FORCE_MAJEURE -> headwayUseCase.fineForDelta(assessment.deltaSeconds)
@@ -1033,6 +1091,21 @@ class CronoBusJsBridge(
             )
         } ?: return
 
+        // Escritura incremental y transaccional. Si falla (disco lleno, corrupción), la sesión
+        // conserva el importe en memoria y el conductor ve un error explícito; no se silencia.
+        runCatching {
+            ledgerDao.accumulateAssessment(
+                unitId = unitId,
+                routeId = routeId,
+                grossFineMxn = theoreticalFine,
+                forgivenMxn = forgiven,
+                atUtcMs = observedAtUtcMs,
+            )
+        }.onFailure { failure ->
+            Log.e(TAG, "No se pudo persistir el ledger financiero de la unidad $unitId.", failure)
+            pushError("financialLedger", "No se pudo guardar el acumulado financiero local.")
+        }
+
         SessionState.dispatchMutex.withLock {
             SessionState.dispatchQueue = dispatchUseCase.updateMetrics(
                 queue = SessionState.dispatchQueue,
@@ -1049,6 +1122,7 @@ class CronoBusJsBridge(
     // ---------------------------------------------------------------------------------------------
 
     private suspend fun buildDispatchQueue(): List<DispatchQueueSlot> {
+        ensureFinancialLedgerHydrated()
         val shifts = runCatching { shiftDao.getActiveShifts() }.getOrDefault(emptyList())
         val nowUtcMs = System.currentTimeMillis()
 
@@ -1083,6 +1157,7 @@ class CronoBusJsBridge(
     // ---------------------------------------------------------------------------------------------
 
     private suspend fun buildFinancialCsvRows(): List<FinancialCsvRow> {
+        ensureFinancialLedgerHydrated()
         val shifts = runCatching { shiftDao.getRecentShifts(FINANCIAL_SHIFT_LIMIT) }
             .getOrDefault(emptyList())
         val units = LinkedHashMap<String, String>()

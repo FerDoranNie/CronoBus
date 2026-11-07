@@ -71,10 +71,10 @@
         document.body.classList.add('tailwind-fallback');
       }
       if (typeof L === 'undefined') {
-        console.error("Leaflet failed to load. Maps will not work.");
+        console.error("Leaflet offline failed to load. Maps will not work.");
         const errorDiv = document.getElementById('critical-error-banner');
         if (errorDiv) {
-          errorDiv.innerText = "Error: Leaflet (Mapas) no cargó. Verifica tu conexión.";
+          errorDiv.innerText = "Error: el motor de mapas offline no cargó desde los assets locales.";
           errorDiv.style.display = 'block';
         }
       }
@@ -703,16 +703,16 @@
     let publicMarkers = {};
 
     function initMaps() {
-      // Regla offline-first: sin Leaflet (CDN no empaquetado aún, tarea 1.3) la app debe seguir
-      // funcionando. El checador, el headway, el ETA y el CSV son nativos y no dependen del mapa.
+      // Offline-first: leaflet_offline.js dibuja la retícula en canvas sin descargar mosaicos.
+      // Si el motor no cargara, el checador, el headway, el ETA y el CSV siguen siendo nativos.
       if (typeof L === 'undefined') {
-        console.warn('Leaflet no disponible sin conexión; mapas deshabilitados.');
+        console.warn('Motor de mapas offline no disponible; mapas deshabilitados.');
         return;
       }
 
       // Admin Map
       mapAdmin = L.map('map-admin', { zoomControl: false }).setView([19.4245, -99.1750], 15);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapAdmin);
+      L.tileLayer('offline://cronobus/{z}/{x}/{y}', { attribution: 'Mapa offline CronoBus' }).addTo(mapAdmin);
       L.control.zoom({ position: 'topright' }).addTo(mapAdmin);
       
       // Polyline
@@ -725,7 +725,7 @@
 
       // Public Map
       mapPublic = L.map('map-public', { zoomControl: false }).setView([19.4245, -99.1750], 15);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapPublic);
+      L.tileLayer('offline://cronobus/{z}/{x}/{y}', { attribution: 'Mapa offline CronoBus' }).addTo(mapPublic);
       L.polyline(routeCoords, { color: '#0b6c4b', weight: 5, opacity: 0.5 }).addTo(mapPublic);
 
       createMarkers();
@@ -995,6 +995,9 @@
           const isDark = document.body.classList.toggle('dark-mode');
           localStorage.setItem('cronobus_dark_mode', isDark ? 'true' : 'false');
           darkModeBtn.innerText = isDark ? '☀️ Modo Día' : '🌙 Modo Noche';
+          // Redibuja la retícula/popups con la paleta Classic Signal oscura.
+          if (mapAdmin) mapAdmin.invalidateSize();
+          if (mapPublic) mapPublic.invalidateSize();
         });
       }
     }
@@ -1485,8 +1488,8 @@
       firstBtn.classList.add('border-[#0b6c4b]', 'text-[#0b6c4b]');
       firstBtn.classList.remove('border-transparent', 'text-[#444748]');
 
-      initMaps();
       initDarkMode();
+      initMaps();
       requestDispatchQueue();
       console.log("CronoBus logic initialized.");
       requestAnimationFrame(tick);
