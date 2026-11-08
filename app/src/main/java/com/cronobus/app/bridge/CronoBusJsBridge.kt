@@ -78,8 +78,8 @@ import org.json.JSONObject
  * inyección de JavaScript desde nombres de ruta, alias del conductor o descripciones de incidencia.
  *
  * ## Seguridad
- * - El puente solo se registra en el `WebView` local; el cliente bloquea cualquier navegación
- *   fuera de `file:///android_asset/` (ver `MainActivity`).
+ * - El puente solo se registra en el `WebView` local; el cliente bloquea cualquier navegación y
+ *   recurso fuera de `https://appassets.androidplatform.net/assets/` (ver `MainActivity`).
  * - Los métodos validan longitud y rango de cada argumento: el contenido de la SPA no se asume
  *   confiable aunque sea un asset propio.
  * - Un incidente o apelación exige un *fix* GPS fresco y no simulado; sin evidencia no se crea
@@ -123,16 +123,6 @@ class CronoBusJsBridge(
      * y sanciones en el ledger. Se serializa el registro completo del checador.
      */
     private val checkpointMutex = Mutex()
-
-    /**
-     * Hidratación única del ledger financiero desde Room. Varias corrutinas (resumen, despacho,
-     * exportación CSV y cruces del checador) pueden pedir el estado a la vez; el mutex evita leer
-     * la tabla dos veces y publicar un resumen incompleto.
-     */
-    private val ledgerHydrationMutex = Mutex()
-
-    @Volatile
-    private var ledgerHydrated = false
 
     /** Evita turnos duplicados por doble toque en "Iniciar Turno" mientras el primero persiste. */
     private val shiftStartInFlight = AtomicBoolean(false)
@@ -210,6 +200,20 @@ class CronoBusJsBridge(
         val lastDepartureByUnit = ConcurrentHashMap<String, Long>()
         val speedSamples = ArrayDeque<Double>()
         val dispatchMutex = Mutex()
+
+        /**
+         * Auditoría Paso 3 (S4): el mutex y la bandera de hidratación eran **por instancia** del
+         * puente, mientras que `ledger` es de proceso. Tras una rotación, la hidratación del
+         * puente nuevo podía leer Room en paralelo a un `accumulateAssessment` del puente viejo.
+         * Ahora toda lectura/escritura del ledger se serializa con un único mutex de proceso.
+         *
+         * Orden de bloqueo permitido: `checkpointMutex → ledgerMutex` y
+         * `dispatchMutex → ledgerMutex`. **Nunca** tomar `dispatchMutex` con `ledgerMutex` tomado.
+         */
+        val ledgerMutex = Mutex()
+
+        @Volatile
+        var ledgerHydrated: Boolean = false
 
         @Volatile
         var dispatchQueue: List<DispatchQueueSlot> = emptyList()
@@ -962,30 +966,36 @@ class CronoBusJsBridge(
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * Carga en [SessionState.ledger] el acumulado persistido. `putIfAbsent` conserva el estado en
-     * memoria si ya es más reciente (misma sesión, rotación de Activity).
+     * Carga en [SessionState.ledger] el acumulado persistido (una vez por proceso).
+     *
+     * Room es la fuente de verdad; solo se conserva el valor en memoria si tiene más evaluaciones
+     * que la fila persistida (caso de un `accumulateAssessment` que falló por disco lleno).
      */
     private suspend fun ensureFinancialLedgerHydrated() {
-        if (ledgerHydrated) return
+        if (SessionState.ledgerHydrated) return
+        SessionState.ledgerMutex.withLock { hydrateLedgerLocked() }
+    }
 
-        ledgerHydrationMutex.withLock {
-            if (ledgerHydrated) return
+    /** Requiere [SessionState.ledgerMutex] tomado (el `Mutex` de corrutinas no es reentrante). */
+    private suspend fun hydrateLedgerLocked() {
+        if (SessionState.ledgerHydrated) return
 
-            val persisted = runCatching { ledgerDao.getAll() }
-            if (persisted.isFailure) {
-                Log.w(
-                    TAG,
-                    "No se pudo leer el ledger financiero persistido.",
-                    persisted.exceptionOrNull(),
-                )
-                return
-            }
-
-            persisted.getOrThrow().forEach { entity ->
-                SessionState.ledger.putIfAbsent(entity.unitId, entity.toSessionState())
-            }
-            ledgerHydrated = true
+        val persisted = runCatching { ledgerDao.getAll() }
+        if (persisted.isFailure) {
+            Log.w(
+                TAG,
+                "No se pudo leer el ledger financiero persistido.",
+                persisted.exceptionOrNull(),
+            )
+            return
         }
+
+        persisted.getOrThrow().forEach { entity ->
+            SessionState.ledger.merge(entity.unitId, entity.toSessionState()) { inMemory, stored ->
+                if (inMemory.assessments > stored.assessments) inMemory else stored
+            }
+        }
+        SessionState.ledgerHydrated = true
     }
 
     private fun FinancialLedgerEntity.toSessionState() = UnitFinancialState(
@@ -1065,10 +1075,6 @@ class CronoBusJsBridge(
         assessment: HeadwayAssessment,
         observedAtUtcMs: Long,
     ) {
-        // La caché debe partir del acumulado persistido; de lo contrario un reinicio del proceso
-        // haría que el primer cruce pareciera la única sanción de la unidad.
-        ensureFinancialLedgerHydrated()
-
         val theoreticalFine = when (assessment.status) {
             HeadwayStatus.LATE_FINE -> assessment.suggestedFineAmountMxn
             HeadwayStatus.EXEMPT_FORCE_MAJEURE -> headwayUseCase.fineForDelta(assessment.deltaSeconds)
@@ -1080,32 +1086,41 @@ class CronoBusJsBridge(
             0.0
         }
 
-        val updated = SessionState.ledger.compute(unitId) { _, previous ->
-            val base = previous ?: UnitFinancialState(routeId = routeId)
-            base.copy(
-                routeId = routeId,
-                grossFinesMxn = base.grossFinesMxn + theoreticalFine,
-                forgivenFinesMxn = base.forgivenFinesMxn + forgiven,
-                assessments = base.assessments + 1,
-                exemptions = base.exemptions + if (forgiven > 0.0) 1 else 0,
-            )
+        // Auditoría Paso 3 (S4): hidratación + escritura + caché bajo el mismo mutex de proceso.
+        // La caché se actualiza con la fila que devolvió la transacción de Room, no con una suma
+        // paralela en memoria: si la hidratación había fallado, el primer cruce ya no hace que
+        // el acumulado de la unidad parezca solo esa sanción.
+        val updated = SessionState.ledgerMutex.withLock {
+            hydrateLedgerLocked()
+            try {
+                ledgerDao.accumulateAssessment(
+                    unitId = unitId,
+                    routeId = routeId,
+                    grossFineMxn = theoreticalFine,
+                    forgivenMxn = forgiven,
+                    atUtcMs = observedAtUtcMs,
+                ).toSessionState().also { SessionState.ledger[unitId] = it }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                // Disco lleno / corrupción: la sesión conserva el importe en memoria y el
+                // conductor ve un error explícito; no se silencia.
+                Log.e(TAG, "No se pudo persistir el ledger financiero de la unidad $unitId.", failure)
+                pushError("financialLedger", "No se pudo guardar el acumulado financiero local.")
+                SessionState.ledger.compute(unitId) { _, previous ->
+                    val base = previous ?: UnitFinancialState(routeId = routeId)
+                    base.copy(
+                        routeId = routeId,
+                        grossFinesMxn = base.grossFinesMxn + theoreticalFine,
+                        forgivenFinesMxn = base.forgivenFinesMxn + forgiven,
+                        assessments = base.assessments + 1,
+                        exemptions = base.exemptions + if (forgiven > 0.0) 1 else 0,
+                    )
+                }
+            }
         } ?: return
 
-        // Escritura incremental y transaccional. Si falla (disco lleno, corrupción), la sesión
-        // conserva el importe en memoria y el conductor ve un error explícito; no se silencia.
-        runCatching {
-            ledgerDao.accumulateAssessment(
-                unitId = unitId,
-                routeId = routeId,
-                grossFineMxn = theoreticalFine,
-                forgivenMxn = forgiven,
-                atUtcMs = observedAtUtcMs,
-            )
-        }.onFailure { failure ->
-            Log.e(TAG, "No se pudo persistir el ledger financiero de la unidad $unitId.", failure)
-            pushError("financialLedger", "No se pudo guardar el acumulado financiero local.")
-        }
-
+        // `ledgerMutex` ya está liberado: respeta el orden `dispatchMutex → ledgerMutex`.
         SessionState.dispatchMutex.withLock {
             SessionState.dispatchQueue = dispatchUseCase.updateMetrics(
                 queue = SessionState.dispatchQueue,

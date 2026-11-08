@@ -47,6 +47,10 @@ abstract class FinancialLedgerDao {
      *   negativo por datos corruptos.
      * - Un importe condonado incrementa también el contador de exenciones usado por el despacho
      *   equitativo.
+     *
+     * Auditoría Paso 3 (S4): devuelve la fila **persistida** tras la transacción. El puente usa
+     * ese valor como caché en lugar de sumar por separado en memoria, de modo que Room y la caché
+     * no pueden divergir (antes un fallo de hidratación dejaba la caché por debajo de la base).
      */
     @Transaction
     open suspend fun accumulateAssessment(
@@ -55,37 +59,40 @@ abstract class FinancialLedgerDao {
         grossFineMxn: Double,
         forgivenMxn: Double,
         atUtcMs: Long,
-    ) {
+    ): FinancialLedgerEntity {
         val safeGross = if (grossFineMxn.isFinite()) grossFineMxn.coerceAtLeast(0.0) else 0.0
         val safeForgiven =
             if (forgivenMxn.isFinite()) forgivenMxn.coerceIn(0.0, safeGross) else 0.0
+        val exemptionIncrement = if (safeForgiven > 0.0) 1 else 0
         val previous = getByUnit(unitId)
 
-        if (previous == null) {
-            insertIfAbsent(
-                FinancialLedgerEntity(
-                    unitId = unitId,
-                    routeId = routeId,
-                    grossFinesMxn = safeGross,
-                    forgivenFinesMxn = safeForgiven,
-                    assessmentsCount = 1,
-                    exemptionsCount = if (safeForgiven > 0.0) 1 else 0,
-                    updatedAtUtcMs = atUtcMs,
-                ),
-            )
-            return
-        }
-
-        update(
+        val result = if (previous == null) {
+            FinancialLedgerEntity(
+                unitId = unitId,
+                routeId = routeId,
+                grossFinesMxn = safeGross,
+                forgivenFinesMxn = safeForgiven,
+                assessmentsCount = 1,
+                exemptionsCount = exemptionIncrement,
+                updatedAtUtcMs = atUtcMs,
+            ).also { created ->
+                // Dentro de la transacción no puede haber otra fila; si la hubiera (IGNORE → -1),
+                // fallar es preferible a perder el importe en silencio.
+                check(insertIfAbsent(created) != -1L) {
+                    "Conflicto inesperado al crear el ledger de la unidad $unitId."
+                }
+            }
+        } else {
             previous.copy(
                 routeId = routeId,
                 grossFinesMxn = previous.grossFinesMxn + safeGross,
                 forgivenFinesMxn = previous.forgivenFinesMxn + safeForgiven,
                 assessmentsCount = previous.assessmentsCount + 1,
-                exemptionsCount = previous.exemptionsCount + if (safeForgiven > 0.0) 1 else 0,
+                exemptionsCount = previous.exemptionsCount + exemptionIncrement,
                 updatedAtUtcMs = atUtcMs,
-            ),
-        )
+            ).also { update(it) }
+        }
+        return result
     }
 
     /** Borra el acumulado. Solo para mantenimiento explícito o pruebas; nunca en producción. */

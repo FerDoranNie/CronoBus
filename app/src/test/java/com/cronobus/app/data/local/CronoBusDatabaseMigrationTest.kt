@@ -1,11 +1,15 @@
 package com.cronobus.app.data.local
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -274,6 +278,169 @@ class CronoBusDatabaseMigrationTest {
         } finally {
             helper.close()
             context.deleteDatabase(dbName)
+        }
+    }
+
+    /**
+     * Auditoría Paso 3 (S4): ejecutar `MIGRATION_2_3.migrate(db)` a mano no prueba que Room acepte
+     * el esquema resultante. Aquí se abre una base **Room real** tras migrar, lo que dispara
+     * `onValidateSchema` (comparación `TableInfo` columna a columna, tipos, PK y nulabilidad contra
+     * `FinancialLedgerEntity`). Si el DDL de la migración divergiera de la entidad, Room lanzaría
+     * `IllegalStateException: Migration didn't properly handle: financial_ledger`.
+     *
+     * La base v2 se obtiene creando el esquema real de Room v3 y revirtiéndolo a v2 (sin
+     * `financial_ledger`, `user_version = 2`), así las tablas de evidencia son byte a byte las que
+     * genera KSP y no una copia manual que pueda quedar desactualizada.
+     */
+    @Test
+    fun `room opens real database after migrating 2 to 3 and validates ledger schema`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "cronobus_room_open_2_3_test.db"
+        context.deleteDatabase(dbName)
+
+        try {
+            prepareVersion2Database(context, dbName)
+
+            val migrated = Room.databaseBuilder(context, CronoBusDatabase::class.java, dbName)
+                .addMigrations(CronoBusDatabase.MIGRATION_1_2, CronoBusDatabase.MIGRATION_2_3)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                val ledgerDao = migrated.financialLedgerDao()
+                runBlocking {
+                    // Primer acceso: abre la base, migra 2 → 3 y valida el esquema completo.
+                    assertEquals(0, ledgerDao.count())
+
+                    val first = ledgerDao.accumulateAssessment(
+                        unitId = "14",
+                        routeId = "Ruta 42 - Ramal Centro",
+                        grossFineMxn = 120.0,
+                        forgivenMxn = 0.0,
+                        atUtcMs = 1_760_000_000_000L,
+                    )
+                    val second = ledgerDao.accumulateAssessment(
+                        unitId = "14",
+                        routeId = "Ruta 42 - Ramal Centro",
+                        grossFineMxn = 80.0,
+                        forgivenMxn = 80.0,
+                        atUtcMs = 1_760_000_060_000L,
+                    )
+                    assertEquals(120.0, first.grossFinesMxn, 0.0001)
+                    assertEquals(200.0, second.grossFinesMxn, 0.0001)
+                    assertEquals(80.0, second.forgivenFinesMxn, 0.0001)
+                    assertEquals(2, second.assessmentsCount)
+                    assertEquals(1, second.exemptionsCount)
+                    assertEquals(second, ledgerDao.getByUnit("14"))
+                }
+
+                val db = migrated.openHelper.writableDatabase
+                assertEquals(3, db.version)
+                db.query("SELECT unitId, checkpointId, occupancyLevel FROM `checkpoint_events`")
+                    .use { cursor ->
+                        assertTrue("La evidencia v2 debe sobrevivir a Room 2 → 3", cursor.moveToFirst())
+                        assertEquals("14", cursor.getString(0))
+                        assertEquals("diana", cursor.getString(1))
+                        assertEquals("MEDIA", cursor.getString(2))
+                    }
+            } finally {
+                migrated.close()
+            }
+
+            // Reapertura en frío (equivalente a muerte del proceso): el ledger sigue ahí.
+            val reopened = Room.databaseBuilder(context, CronoBusDatabase::class.java, dbName)
+                .addMigrations(CronoBusDatabase.MIGRATION_1_2, CronoBusDatabase.MIGRATION_2_3)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                runBlocking {
+                    val persisted = reopened.financialLedgerDao().getByUnit("14")
+                    assertNotNull(persisted)
+                    assertEquals(120.0, persisted!!.netFinesMxn, 0.0001)
+                }
+            } finally {
+                reopened.close()
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    /** Sin `MIGRATION_2_3` Room debe fallar en QA (nunca hay fallback destructivo). */
+    @Test
+    fun `room refuses to open version 2 database without migration 2 to 3`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "cronobus_room_missing_2_3_test.db"
+        context.deleteDatabase(dbName)
+
+        try {
+            prepareVersion2Database(context, dbName)
+
+            val database = Room.databaseBuilder(context, CronoBusDatabase::class.java, dbName)
+                .addMigrations(CronoBusDatabase.MIGRATION_1_2)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                val failure = runCatching { database.openHelper.writableDatabase }.exceptionOrNull()
+                assertTrue(
+                    "Se esperaba IllegalStateException por migración faltante, se obtuvo $failure",
+                    failure is IllegalStateException,
+                )
+            } finally {
+                database.close()
+            }
+
+            // La evidencia no se borró por el intento fallido.
+            SQLiteDatabase.openDatabase(
+                context.getDatabasePath(dbName).path,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+            ).use { raw ->
+                raw.rawQuery("SELECT COUNT(*) FROM `checkpoint_events`", null).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1, cursor.getInt(0))
+                }
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    /**
+     * Crea el esquema real de Room, inserta evidencia del checador y revierte la base al estado
+     * v2: sin `financial_ledger`, `user_version = 2` y hash de identidad distinto al de v3.
+     */
+    private fun prepareVersion2Database(context: Context, dbName: String) {
+        val bootstrap = Room.databaseBuilder(context, CronoBusDatabase::class.java, dbName)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            bootstrap.openHelper.writableDatabase.execSQL(
+                """
+                INSERT INTO `checkpoint_events` (
+                    `shiftId`, `unitId`, `routeId`, `checkpointId`, `checkpointName`,
+                    `eventType`, `latitude`, `longitude`, `filteredSpeedMps`,
+                    `headwayDeltaSeconds`, `occupancyLevel`, `timestampUtcMs`,
+                    `elapsedRealtimeNanos`, `syncStatus`, `retryCount`, `lastSyncAttemptMs`
+                ) VALUES (
+                    'shift-u14', '14', 'Ruta 42 - Ramal Centro', 'diana', 'Estación Diana',
+                    'ENTER', 19.4255, -99.1720, 7.5,
+                    45, 'MEDIA', 1760000000000,
+                    1760000000000000, 'PENDING', 0, NULL
+                )
+                """.trimIndent(),
+            )
+        } finally {
+            bootstrap.close()
+        }
+
+        SQLiteDatabase.openDatabase(
+            context.getDatabasePath(dbName).path,
+            null,
+            SQLiteDatabase.OPEN_READWRITE,
+        ).use { raw ->
+            raw.execSQL("DROP TABLE IF EXISTS `financial_ledger`")
+            raw.execSQL("UPDATE room_master_table SET identity_hash = 'cronobus-v2-test-hash'")
+            raw.version = 2
         }
     }
 }

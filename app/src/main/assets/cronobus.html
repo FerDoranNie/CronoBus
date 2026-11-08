@@ -8,10 +8,15 @@
   <!-- Local Offline CSS (Classic Signal Design System) -->
   <link rel="stylesheet" href="classic_signal_offline.css" />
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!--
+    Auditoría Paso 3 (S4): se retiró <script src="https://cdn.tailwindcss.com">. Un script remoto
+    se ejecutaba en el mismo frame que window.CronoBusNative; MainActivity ahora bloquea todo
+    recurso fuera de https://appassets.androidplatform.net/assets/. El diseño Classic Signal lo
+    garantiza classic_signal_offline.css. La configuración se conserva (con guardia) por si en el
+    futuro se empaqueta un build local de Tailwind.
+  -->
   <script>
-    tailwind.config = {
+    if (window.tailwind) tailwind.config = {
       theme: {
         extend: {
           colors: {
@@ -67,7 +72,7 @@
     window.addEventListener('load', () => {
       console.log("CronoBus HTML window loaded.");
       if (typeof tailwind === 'undefined') {
-        console.warn("Tailwind CDN failed to load. Using fallback styles.");
+        // Esperado: el CDN ya no se carga (seguridad del puente). Estilos 100% locales.
         document.body.classList.add('tailwind-fallback');
       }
       if (typeof L === 'undefined') {
@@ -81,9 +86,8 @@
     });
   </script>
 
-  <!-- Google Fonts: Inter -->
+  <!-- Tipografía: Inter si está instalada en el sistema; sin descarga remota (offline-first). -->
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
     html, body {
       height: 100%;

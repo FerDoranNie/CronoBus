@@ -316,10 +316,24 @@ fun WebViewScreen(
                 bridge?.let { addJavascriptInterface(it, CronoBusJsBridge.JS_INTERFACE_NAME) }
 
                 webViewClient = object : WebViewClient() {
+                    /**
+                     * Auditoría Paso 3 (S4 — MASVS-PLATFORM): `addJavascriptInterface` expone el
+                     * puente a **todo** script del documento. Antes `cdn.tailwindcss.com` y Google
+                     * Fonts se descargaban y ejecutaban en el mismo frame que `CronoBusNative`
+                     * (un CDN comprometido podía abrir turnos o firmar apelaciones). Ahora solo
+                     * se sirve el origen local; cualquier otra petición recibe un 403 vacío y la
+                     * SPA usa `classic_signal_offline.css` (regla de oro #1, offline-first).
+                     */
                     override fun shouldInterceptRequest(
                         view: WebView,
                         request: WebResourceRequest,
-                    ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+                    ): WebResourceResponse? {
+                        if (isLocalOrigin(request.url)) {
+                            return assetLoader.shouldInterceptRequest(request.url)
+                        }
+                        Log.w(TAG, "Recurso remoto bloqueado en el WebView: ${request.url.host}")
+                        return blockedResponse()
+                    }
 
                     override fun shouldOverrideUrlLoading(
                         view: WebView,
@@ -368,10 +382,25 @@ fun WebViewScreen(
 private fun isLocalOrigin(uri: Uri): Boolean {
     // Auditoría Paso 3 / Fase 5: con el puente expuesto el allowlist debe ser exacto. Ya no se
     // acepta ningún `file://`; los assets llegan exclusivamente por WebViewAssetLoader.
+    // Auditoría Paso 3 (S4): se rechazan segmentos `..` (codificados o no) para que una ruta como
+    // `/assets/../x` no pase el prefijo; el AssetsPathHandler ya lo bloquea, esto es defensa doble.
     return when (uri.scheme?.lowercase()) {
         "https" -> uri.host == ASSET_LOADER_DOMAIN &&
-            uri.path?.startsWith(ASSET_PATH_PREFIX) == true
+            uri.port == -1 &&
+            uri.path?.startsWith(ASSET_PATH_PREFIX) == true &&
+            uri.pathSegments.none { it == ".." }
         "about" -> uri.toString() == "about:blank"
         else -> false
     }
 }
+
+/** Respuesta vacía para recursos remotos bloqueados (no deja que la petición salga a la red). */
+private fun blockedResponse(): WebResourceResponse =
+    WebResourceResponse(
+        "text/plain",
+        "utf-8",
+        403,
+        "Blocked",
+        emptyMap(),
+        java.io.ByteArrayInputStream(ByteArray(0)),
+    )
