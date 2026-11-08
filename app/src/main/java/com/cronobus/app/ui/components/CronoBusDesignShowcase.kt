@@ -60,11 +60,19 @@ fun DriverShiftStatusCard(
     isOnline: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val cardBg = if (isDark) Color(0xFF1E1E1E) else Color.White
+    val borderColor = if (isDark) Color(0xFF333333) else ClassicSignalBorder
+    val primaryText = if (isDark) Color(0xFFF5F5F5) else SignalLightPrimary
+    val mutedText = if (isDark) Color(0xFFC4C7C7) else Color(0xFF444748)
+    val surfaceBox = if (isDark) Color(0xFF141414) else SignalLightSurface
+    val greenValue = if (isDark) Color(0xFFA0F4CA) else SignalLightSecondary
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RectangleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, ClassicSignalBorder),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -81,7 +89,7 @@ fun DriverShiftStatusCard(
                 Box(
                     modifier = Modifier
                         .background(SignalLightSecondary)
-                        .border(1.dp, SignalLightPrimary, RectangleShape)
+                        .border(1.dp, borderColor, RectangleShape)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
@@ -98,15 +106,15 @@ fun DriverShiftStatusCard(
                         modifier = Modifier
                             .size(10.dp)
                             .background(
-                                color = if (isOnline) SignalLightSecondary else SignalLightError,
+                                color = if (isOnline) greenValue else SignalLightError,
                                 shape = CircleShape,
                             )
-                            .border(1.dp, SignalLightPrimary, CircleShape),
+                            .border(1.dp, borderColor, CircleShape),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isOnline) "EN LÍNEA" else "MODO OFFLINE",
-                        color = SignalLightPrimary,
+                        color = primaryText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -120,11 +128,11 @@ fun DriverShiftStatusCard(
                 text = routeName.uppercase(),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Black,
-                color = SignalLightPrimary,
+                color = primaryText,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(thickness = 1.dp, color = ClassicSignalBorder)
+            HorizontalDivider(thickness = 1.dp, color = borderColor)
             Spacer(modifier = Modifier.height(12.dp))
 
             // Checador Digital: Headway e Intervalo
@@ -138,13 +146,13 @@ fun DriverShiftStatusCard(
                         text = "INTERVALO / HEADWAY",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = headwayText,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightSecondary,
+                        color = greenValue,
                         letterSpacing = (-0.5).sp,
                     )
                 }
@@ -152,13 +160,13 @@ fun DriverShiftStatusCard(
                 // Badge de Estatus Operativo
                 Box(
                     modifier = Modifier
-                        .background(SignalLightSecondaryContainer)
-                        .border(1.dp, SignalLightOnSecondaryContainer, RectangleShape)
+                        .background(if (isDark) Color(0xFF0B3D2B) else SignalLightSecondaryContainer)
+                        .border(1.dp, if (isDark) SignalLightSecondary else SignalLightOnSecondaryContainer, RectangleShape)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Text(
                         text = statusLabel.uppercase(),
-                        color = SignalLightOnSecondaryContainer,
+                        color = if (isDark) SignalLightSecondaryContainer else SignalLightOnSecondaryContainer,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -171,8 +179,8 @@ fun DriverShiftStatusCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SignalLightSurface)
-                    .border(1.dp, ClassicSignalBorder, RectangleShape)
+                    .background(surfaceBox)
+                    .border(1.dp, borderColor, RectangleShape)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             ) {
                 Row(
@@ -184,13 +192,13 @@ fun DriverShiftStatusCard(
                         text = "STORE & FORWARD QUEUE",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = if (pendingSyncCount > 0) "SYNC: $pendingSyncCount PEND" else "SYNC: AL DÍA",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (pendingSyncCount > 0) ClassicSignalAccent else SignalLightSecondary,
+                        color = if (pendingSyncCount > 0) ClassicSignalAccent else greenValue,
                     )
                 }
             }
@@ -208,11 +216,19 @@ fun AdminFinancialDispatchCard(
     nextDispatchUnit: String,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val cardBg = if (isDark) Color(0xFF1E1E1E) else Color.White
+    val borderColor = if (isDark) Color(0xFF333333) else ClassicSignalBorder
+    val primaryText = if (isDark) Color(0xFFF5F5F5) else SignalLightPrimary
+    val mutedText = if (isDark) Color(0xFFC4C7C7) else Color(0xFF444748)
+    val greenValue = if (isDark) Color(0xFFA0F4CA) else SignalLightSecondary
+    val errorValue = if (isDark) Color(0xFFFFB4AB) else SignalLightError
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RectangleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, ClassicSignalBorder),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -230,12 +246,12 @@ fun AdminFinancialDispatchCard(
                     text = "DESPACHO & CONTROL ITS",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Black,
-                    color = SignalLightPrimary,
+                    color = primaryText,
                 )
                 Box(
                     modifier = Modifier
                         .background(SignalLightPrimary)
-                        .border(1.dp, SignalLightPrimary, RectangleShape)
+                        .border(1.dp, borderColor, RectangleShape)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
@@ -267,7 +283,7 @@ fun AdminFinancialDispatchCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(thickness = 1.dp, color = ClassicSignalBorder)
+            HorizontalDivider(thickness = 1.dp, color = borderColor)
             Spacer(modifier = Modifier.height(12.dp))
 
             // Rejilla Financiera 2x2
@@ -277,13 +293,13 @@ fun AdminFinancialDispatchCard(
                         text = "UNIDADES EN RUTA",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = activeUnitsText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightPrimary,
+                        color = primaryText,
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -291,13 +307,13 @@ fun AdminFinancialDispatchCard(
                         text = "RECAUDACIÓN SAAS",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = saasTotalText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightSecondary,
+                        color = greenValue,
                     )
                 }
             }
@@ -310,13 +326,13 @@ fun AdminFinancialDispatchCard(
                         text = "MULTAS NETAS",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = netFinesText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightError,
+                        color = errorValue,
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -324,13 +340,13 @@ fun AdminFinancialDispatchCard(
                         text = "BONO PUNTUALIDAD",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = bonusTotalText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightPrimary,
+                        color = primaryText,
                     )
                 }
             }
@@ -347,11 +363,19 @@ fun PassengerEtaCard(
     isStaleCache: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val cardBg = if (isDark) Color(0xFF1E1E1E) else Color.White
+    val borderColor = if (isDark) Color(0xFF333333) else ClassicSignalBorder
+    val primaryText = if (isDark) Color(0xFFF5F5F5) else SignalLightPrimary
+    val mutedText = if (isDark) Color(0xFFC4C7C7) else Color(0xFF444748)
+    val surfaceBox = if (isDark) Color(0xFF141414) else SignalLightSurface
+    val greenValue = if (isDark) Color(0xFFA0F4CA) else SignalLightSecondary
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RectangleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, ClassicSignalBorder),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -364,17 +388,17 @@ fun PassengerEtaCard(
                 text = routeName.uppercase(),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Black,
-                color = SignalLightPrimary,
+                color = primaryText,
             )
             Text(
                 text = "PARADA: $stopName",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF444748),
+                color = mutedText,
             )
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(thickness = 1.dp, color = ClassicSignalBorder)
+            HorizontalDivider(thickness = 1.dp, color = borderColor)
             Spacer(modifier = Modifier.height(10.dp))
 
             // Estimación ETA y Nivel de Ocupación
@@ -388,13 +412,13 @@ fun PassengerEtaCard(
                         text = "PRÓXIMO ARRIBO ESTIMADO",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                     Text(
                         text = if (etaMinutes <= 0) "< 1 min" else "$etaMinutes min",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Black,
-                        color = SignalLightSecondary,
+                        color = greenValue,
                         letterSpacing = (-1).sp,
                     )
                 }
@@ -426,15 +450,15 @@ fun PassengerEtaCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(SignalLightSurface)
-                        .border(1.dp, ClassicSignalBorder, RectangleShape)
+                        .background(surfaceBox)
+                        .border(1.dp, borderColor, RectangleShape)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
                         text = "📡 ESTIMACIÓN CON CACHÉ LOCAL RESILIENTE (SIN RED)",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF444748),
+                        color = mutedText,
                     )
                 }
             }

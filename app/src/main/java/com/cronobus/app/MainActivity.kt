@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridge: CronoBusJsBridge
     private lateinit var syncManager: StoreAndForwardSyncManager
 
+    @Suppress("InvalidFragmentVersionForActivityResult")
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
      * Captura de evidencia con la app de cámara del sistema. El contrato propio concede el URI
      * de FileProvider a la cámara; al volver, el puente valida que el archivo no esté vacío.
      */
+    @Suppress("InvalidFragmentVersionForActivityResult")
     private val takePictureLauncher = registerForActivityResult(CapturePhotoContract()) { success ->
         bridge.onPhotoCaptureResult(success)
     }
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
     /** URI pendiente mientras se concede el permiso de cámara. */
     private var pendingCaptureUri: Uri? = null
 
+    @Suppress("InvalidFragmentVersionForActivityResult")
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
